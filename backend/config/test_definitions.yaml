@@ -1,0 +1,418 @@
+# ============================================================================
+# DATA QUALITY FRAMEWORK - TEST DEFINITIONS
+# ============================================================================
+# This file defines all data quality tests to be executed
+# Version: 1.0
+# 
+# HOW IDs WORK:
+# - IDs are auto-generated from the 'name' field
+# - Example: "Customer Email Null Check" → "customer_email_null_check"
+# - IDs are used for tracking results, APIs, and historical data
+# - If you change the name, the ID changes (be careful with historical data)
+#
+# NAMING CONVENTION:
+# - Use descriptive names: "{Table} {Column} {Test Type}"
+# - Examples: "Customer Email Null Check", "Orders Foreign Key Validation"
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# ENGINE CONFIGURATION
+# ----------------------------------------------------------------------------
+# Which test execution engine to use
+# Options:
+#   - simple: Your own lightweight engine (no external dependencies)
+#   - great_expectations: Use Great Expectations library (requires GE installed)
+#   - soda: Use Soda library (requires Soda installed)
+#
+# For now, only 'simple' is implemented
+
+
+engine: Simple
+
+settings:
+  #Define default profile (profiles must be defined in backend/config/database_connections.yaml)
+  default_profile: dev
+
+  #How often should tests run: Add execution_frequency
+  #execution_frequency: daily
+
+  #default severity if not specified:
+  default_severity: MEDIUM
+
+  #Global Alerting settings
+  alerts:
+    enabled: true
+
+    #slack alerting settings:
+    slack:
+      enabled: true
+      webhook_url: ${SLACK_WEBHOOK}
+      notify_on: [FAILED, ERROR, PASS]
+
+    email:
+      enabled: false
+      recipients: []
+      notify_on: [FAILED, ERROR]
+    
+  
+# ----------------------------------------------------------------------------
+# TEST DEFINITIONS
+# ----------------------------------------------------------------------------
+
+# Each test follows this structure:
+#
+# - name: "Human Readable Name" (REQUIRED)
+#   description: "Optional explanation of what this test does"
+#   type: test_type (REQUIRED)
+#   profile: profile_name (OPTIONAL - uses default_profile if not set)
+#   severity: LOW|MEDIUM|HIGH|CRITICAL (OPTIONAL - uses default_severity if not set)
+#   enabled: true|false (OPTIONAL - default is true)
+#   tags: [tag1, tag2] (OPTIONAL - for filtering/organizing tests)
+#   
+#   table: customers
+#   column: email
+#   threshold: 0.02 OPTIONAL - for null checks, etc.
+
+tests:
+  - name: "Customer Email Null Check"
+    description: "Ensure all customers have email addresses for communication"
+    type: null_check
+    profile: dev  # ← References 'dev' profile from database_connections.yaml
+    severity: HIGH
+    enabled: true
+    tags: [customers, contact_info, critical]
+
+    table: customers
+    column: email
+    threshold: 0.02
+
+  
+  - name: "Order Total Null Check"
+    type: null_check
+    # profile not specified → uses default_profile (dev)
+    severity: CRITICAL
+    tags: [orders, revenue]
+    
+    table: orders
+    column: order_total
+    #Threshold not specified → defaults to 0 (no nulls allowed)
+
+  # Example: Test against production database
+  - name: "Production Customer Email Null Check"
+    description: "Monitor production data quality"
+    type: null_check
+    profile: prod  # ← Override to run against production
+    severity: CRITICAL
+    tags: [customers, production, monitoring]
+    
+    table: customers
+    column: email
+    threshold: 0.01  # Stricter threshold for production
+
+
+  #DUPLEICATION Checks example:
+  - name: "Customer Email Duplicate Check"
+    description: "Detect duplicate customer email addresses"
+    type: duplicate_check
+    severity: MEDIUM
+    tags: [customers, data_integrity]
+    
+    table: customers
+    columns:
+      - email
+    max_allowed: 0  # Optional: allow some duplicates before failing
+
+  - name: "Customer Name and Phone Duplicate Check"
+    description: "Detect customers with same name AND phone (potential duplicates)"
+    type: duplicate_check
+    severity: LOW
+    tags: [customers, data_quality]
+    
+    table: customers
+    columns:
+      - first_name
+      - last_name
+      - phone
+    max_allowed: 5  # Allow up to 5 duplicates (common names)
+
+
+  #UNIQUENESS Checks example:
+
+  - name: "Customer ID Uniqueness"
+    description: "Ensure customer_id is unique (primary key validation)"
+    type: unique_check
+    severity: CRITICAL
+    tags: [customers, schema, primary_key]
+    
+    table: customers
+    column: customer_id
+  
+  - name: "Order ID Uniqueness"
+    type: unique_check
+    severity: CRITICAL
+    tags: [orders, primary_key]
+    
+    table: orders
+    columns: 
+      - order_id
+      - another_one
+
+  #ROW COUNT Check example:
+  
+  - name: "Daily Order Volume Check"
+    description: "Ensure minimum daily order volume (detect system outages)"
+    type: row_count
+    severity: HIGH
+    tags: [orders, volume, daily]
+    
+    table: orders
+    min_rows: 10        # Minimum expected rows
+    max_rows: 10000     # Maximum expected rows
+    #timeframe: daily    # Options: daily, weekly, monthly, all_time
+    #date_column: order_date  # Required if timeframe != all_time
+
+  
+  - name: "Total Customer Count Check"
+    description: "Ensure customer table isn't accidentally truncated"
+    type: row_count
+    severity: CRITICAL
+    tags: [customers, volume]
+    
+    table: customers
+    min_rows: 1000  # Should have at least 1000 customers
+    timeframe: all_time  # Check total row count
+  
+  - name: "Weekly Order Volume Check"
+    type: row_count
+    severity: MEDIUM
+    tags: [orders, weekly]
+    
+    table: orders
+    min_rows: 50
+    max_rows: 100000
+    timeframe: weekly
+    date_column: order_date
+
+  
+  #SCHEMA CHECK example:
+
+  - name: "Customer Table Schema Validation"
+    description: "Ensure customer table has required columns with correct types"
+    type: schema_check
+    severity: HIGH
+    tags: [customers, schema]
+    
+    table: customers
+    expected_columns:
+      customer_id: integer
+      first_name: string
+      last_name: string
+      email: string
+      phone: string
+      signup_date: date
+      country: string
+      customer_tier: string
+
+  - name: "Orders Table Schema Validation"
+    type: schema_check
+    severity: HIGH
+    tags: [orders, schema]
+    
+    table: orders
+    expected_columns:
+      order_id: integer
+      customer_id: integer
+      order_date: datetime
+      order_total: float
+      status: string
+      payment_method: string
+
+  #RANGE CHECK example:
+
+  - name: "Product Price Range Check"
+    description: "Detect unrealistic product prices (data entry errors)"
+    type: range_check
+    severity: HIGH
+    tags: [products, pricing, outliers]
+    
+    table: products
+    column: price
+    min_value: 0.01     # Products can't be free or negative
+    max_value: 10000    # Products can't cost more than $10k
+    max_outliers: 0     # Optional: allow some outliers before failing
+  
+  - name: "Customer Age Range Check"
+    description: "Ensure customer ages are realistic"
+    type: range_check
+    severity: MEDIUM
+    tags: [customers, data_quality]
+    
+    table: customers
+    column: age
+    min_value: 18
+    max_value: 120
+    max_outliers: 5  # Allow up to 5 outliers
+
+  
+  #RELATIONSHIP TESTS example:
+
+  - name: "Orders Foreign Key Validation"
+    description: "Ensure all orders reference valid customers"
+    type: relationship_check
+    severity: CRITICAL
+    tags: [orders, referential_integrity, foreign_keys]
+    
+    source_table: orders
+    source_column: customer_id
+    target_table: customers
+    target_column: customer_id
+    max_orphans: 0  # Optional: no orphaned records allowed
+  
+  - name: "Order Items to Orders Relationship"
+    description: "Ensure all order items reference valid orders"
+    type: relationship_check
+    severity: HIGH
+    tags: [order_items, referential_integrity]
+    
+    source_table: order_items
+    source_column: order_id
+    target_table: orders
+    target_column: order_id
+    max_orphans: 0
+  
+  - name: "Order Items to Products Relationship"
+    type: relationship_check
+    severity: HIGH
+    tags: [order_items, products, referential_integrity]
+    
+    source_table: order_items
+    source_column: product_id
+    target_table: products
+    target_column: product_id
+    max_orphans: 10  # Allow some orphans (products may be discontinued)
+
+
+  # ==========================================================================
+  # CUSTOM SQL TESTS
+  # ==========================================================================
+  # Purpose: Maximum flexibility - run any SQL query
+  # Required fields: query, assertion
+  # 
+  # ASSERTION SYNTAX:
+  #   - Query must return a single row with a single column
+  #   - Assertion evaluates that value
+  #   - Examples: "result == 0", "result < 100", "result >= 1000"
+  #
+  # SECURITY NOTE:
+  #   - SQL is executed directly against your database
+  #   - Only use trusted SQL queries
+  #   - Avoid user-provided SQL in production
+
+  - name: "Daily Revenue Reconciliation"
+    description: "Ensure order totals match payment amounts (no discrepancies)"
+    type: custom_sql
+    severity: HIGH
+    tags: [revenue, reconciliation, financial]
+    
+    query: |
+      SELECT 
+        ABS(
+          COALESCE(SUM(o.order_total), 0) - 
+          COALESCE(SUM(p.payment_amount), 0)
+        ) as discrepancy
+      FROM orders o
+      LEFT JOIN payments p ON o.order_id = p.order_id
+      WHERE DATE(o.order_date) = DATE('now')
+    
+    assertion: "discrepancy < 100"  # Allow $100 discrepancy
+  
+  - name: "Active Orders Without Items Check"
+    description: "Find completed orders with no order items (data integrity issue)"
+    type: custom_sql
+    severity: HIGH
+    tags: [orders, order_items, integrity]
+    
+    query: |
+      SELECT COUNT(*) as orphaned_orders
+      FROM orders o
+      LEFT JOIN order_items oi ON o.order_id = oi.order_id
+      WHERE o.status = 'completed'
+        AND oi.order_item_id IS NULL
+    
+    assertion: "orphaned_orders == 0"
+  
+  - name: "Product Inventory Below Reorder Point"
+    description: "Monitor products that need restocking"
+    type: custom_sql
+    severity: LOW
+    tags: [products, inventory, operations]
+    
+    query: |
+      SELECT COUNT(*) as low_stock_count
+      FROM products
+      WHERE stock_quantity < 10
+        AND category != 'Digital'
+    
+    assertion: "low_stock_count < 5"
+  
+  - name: "Average Order Value Check"
+    description: "Ensure average order value stays above minimum threshold"
+    type: custom_sql
+    severity: MEDIUM
+    tags: [orders, metrics, revenue]
+    
+    query: |
+      SELECT AVG(order_total) as avg_order_value
+      FROM orders
+      WHERE DATE(order_date) >= DATE('now', '-7 days')
+        AND status = 'completed'
+    
+    assertion: "avg_order_value >= 50"
+
+# ============================================================================
+# ADDING NEW TESTS
+# ============================================================================
+# To add a new test:
+# 1. Choose a descriptive name (it becomes the ID)
+# 2. Select the test type (null_check, duplicate_check, etc.)
+# 3. Fill in required fields for that test type
+# 4. Optionally add: description, severity, tags, connection
+# 5. Set enabled: false to disable temporarily without deleting
+#
+# Example:
+# - name: "My New Test"
+#   description: "What this test does"
+#   type: null_check
+#   severity: HIGH
+#   tags: [my_table, critical]
+#   table: my_table
+#   column: my_column
+#   threshold: 0.0
+
+# ============================================================================
+# ORGANIZING TESTS
+# ============================================================================
+# Use tags to organize tests by:
+# - Table: [customers, orders, products]
+# - Priority: [critical, high_priority, low_priority]
+# - Frequency: [daily, hourly, weekly]
+# - Category: [schema, data_quality, referential_integrity]
+# - Team: [data_eng, analytics, ops]
+#
+# Later, you can filter tests by tags:
+#   - Run only critical tests
+#   - Run only customer-related tests
+#   - Run only schema checks
+
+# ============================================================================
+# DISABLING TESTS
+# ============================================================================
+# To temporarily disable a test without deleting it:
+#
+# - name: "My Test"
+#   enabled: false  # ← Add this line
+#   type: null_check
+#   ...
+#
+# The test will be skipped during execution but remains in the config
+# ============================================================================
