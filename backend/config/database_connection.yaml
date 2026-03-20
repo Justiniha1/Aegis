@@ -1,0 +1,41 @@
+dev:
+  type: sqlite
+  path: ../../data/raw/sample_ecommerce.db
+
+# ── Additional profiles (uncomment and fill in to use) ────────────────────────
+
+# staging:
+#   type: postgresql
+#   host: ${STAGING_HOST}
+#   port: 5432
+#   database: mydb
+#   username: ${STAGING_USER}
+#   password: ${STAGING_PASSWORD}
+
+# prod:
+#   type: postgresql
+#   host: ${PROD_HOST}
+#   port: 5432
+#   database: mydb
+#   username: ${PROD_USER}
+#   password: ${PROD_PASSWORD}
+
+# mysql_prod:
+#   type: mysql
+#   host: ${MYSQL_HOST}
+#   port: 3306
+#   database: mydb
+#   username: ${MYSQL_USER}
+#   password: ${MYSQL_PASSWORD}
+
+# sqlserver:
+#   type: mssql
+#   host: ${MSSQL_HOST}
+#   port: 1433
+#   database: mydb
+#   username: ${MSSQL_USER}
+#   password: ${MSSQL_PASSWORD}
+
+# any_db:
+#   type: other
+#   connection_url: "dialect+driver://user:pass@host:port/dbname"
