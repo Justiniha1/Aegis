@@ -3,3 +3,6 @@ uvicorn==0.30.6
 sqlalchemy==2.0.36
 pydantic==2.9.2
 requests==2.32.3
+bcrypt==4.2.1
+PyJWT==2.9.0
+pyyaml==6.0.2

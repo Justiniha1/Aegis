@@ -60,6 +60,58 @@ def _load_yaml(path: Path) -> dict:
         return yaml.safe_load(f) or {}
 
 
+def load_config_from_api(api_url: str, api_key: str, connections: dict) -> DQFConfig:
+    """
+    Fetch test definitions from the Dashboard API instead of YAML.
+    Falls back to load_config() if the API is unreachable.
+    """
+    import requests
+    try:
+        resp = requests.get(
+            f"{api_url.rstrip('/')}/api/v1/tests",
+            headers={"X-API-Key": api_key},
+            timeout=10,
+        )
+        resp.raise_for_status()
+    except Exception as e:
+        raise RuntimeError(f"Could not fetch tests from API: {e}")
+
+    raw_list = resp.json()
+    engine_cfg = EngineConfig(
+        engine="simple",
+        default_profile="dev",
+        default_severity="MEDIUM",
+        alerts={},
+    )
+
+    tests = []
+    for t in raw_list:
+        if not t.get("enabled", True):
+            continue
+        # Reconstruct the 'raw' dict the test modules expect
+        raw = {
+            "name": t["name"],
+            "type": t["type"],
+            "severity": t["severity"],
+            "profile": t["profile"],
+            "enabled": t["enabled"],
+            "tags": t.get("tags", []),
+            **t.get("config", {}),
+        }
+        tests.append(TestDefinition(
+            name=t["name"],
+            test_id=_name_to_id(t["name"]),
+            type=t["type"],
+            profile=t["profile"],
+            severity=t["severity"],
+            enabled=t["enabled"],
+            tags=t.get("tags", []),
+            raw=raw,
+        ))
+
+    return DQFConfig(engine=engine_cfg, connections=connections, tests=tests)
+
+
 def load_config() -> DQFConfig:
     # Support both singular and plural filename variants
     conn_candidates = [

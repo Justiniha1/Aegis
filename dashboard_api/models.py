@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, JSON, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String
 from sqlalchemy.orm import relationship
 
 from dashboard_api.database import Base
@@ -11,10 +11,13 @@ class Client(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String, unique=True, nullable=False)
+    email = Column(String, unique=True, nullable=True)
+    password_hash = Column(String, nullable=True)
     api_key_hash = Column(String, unique=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     results = relationship("TestResult", back_populates="client")
+    test_definitions = relationship("TestDefinition", back_populates="client", cascade="all, delete-orphan")
 
 
 class TestResult(Base):
@@ -32,3 +35,22 @@ class TestResult(Base):
     run_at = Column(DateTime, nullable=False)
 
     client = relationship("Client", back_populates="results")
+
+
+class TestDefinition(Base):
+    __tablename__ = "test_definitions"
+
+    id = Column(Integer, primary_key=True)
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
+    name = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    type = Column(String, nullable=False)
+    severity = Column(String, nullable=False, default="MEDIUM")
+    enabled = Column(Boolean, default=True, nullable=False)
+    tags = Column(JSON, default=list)
+    config = Column(JSON, nullable=False)          # type-specific fields: table, column, threshold, etc.
+    profile = Column(String, default="dev", nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    client = relationship("Client", back_populates="test_definitions")
