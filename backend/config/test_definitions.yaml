@@ -13,7 +13,6 @@
 # NAMING CONVENTION:
 # - Use descriptive names: "{Table} {Column} {Test Type}"
 # - Examples: "Customer Email Null Check", "Orders Foreign Key Validation"
-# ============================================================================
 
 # ----------------------------------------------------------------------------
 # ENGINE CONFIGURATION
@@ -101,10 +100,11 @@ tests:
   - name: "Production Customer Email Null Check"
     description: "Monitor production data quality"
     type: null_check
-    profile: prod  # ← Override to run against production
+    profile: prod_mysql  # ← Override to run against production
     severity: CRITICAL
+    enabled: false  # Disabled until prod_mysql credentials are configured
     tags: [customers, production, monitoring]
-    
+
     table: customers
     column: email
     threshold: 0.01  # Stricter threshold for production
@@ -122,17 +122,17 @@ tests:
       - email
     max_allowed: 0  # Optional: allow some duplicates before failing
 
-  - name: "Customer Name and Phone Duplicate Check"
-    description: "Detect customers with same name AND phone (potential duplicates)"
+  - name: "Customer Name and Country Duplicate Check"
+    description: "Detect customers with same name AND country (potential duplicates)"
     type: duplicate_check
     severity: LOW
     tags: [customers, data_quality]
-    
+
     table: customers
     columns:
       - first_name
       - last_name
-      - phone
+      - country
     max_allowed: 5  # Allow up to 5 duplicates (common names)
 
 
@@ -153,9 +153,8 @@ tests:
     tags: [orders, primary_key]
     
     table: orders
-    columns: 
+    columns:
       - order_id
-      - another_one
 
   #ROW COUNT Check example:
   
@@ -186,11 +185,11 @@ tests:
     type: row_count
     severity: MEDIUM
     tags: [orders, weekly]
-    
+
     table: orders
     min_rows: 50
     max_rows: 100000
-    timeframe: weekly
+    timeframe: all_time  # sample data is from 2024; switch to weekly once using live data
     date_column: order_date
 
   
@@ -208,7 +207,6 @@ tests:
       first_name: string
       last_name: string
       email: string
-      phone: string
       signup_date: date
       country: string
       customer_tier: string
@@ -245,8 +243,9 @@ tests:
     description: "Ensure customer ages are realistic"
     type: range_check
     severity: MEDIUM
+    enabled: false  # customers table has no 'age' column in sample_ecommerce.db
     tags: [customers, data_quality]
-    
+
     table: customers
     column: age
     min_value: 18
@@ -312,18 +311,19 @@ tests:
     description: "Ensure order totals match payment amounts (no discrepancies)"
     type: custom_sql
     severity: HIGH
+    enabled: false  # requires a 'payments' table not present in sample_ecommerce.db
     tags: [revenue, reconciliation, financial]
-    
+
     query: |
-      SELECT 
+      SELECT
         ABS(
-          COALESCE(SUM(o.order_total), 0) - 
+          COALESCE(SUM(o.order_total), 0) -
           COALESCE(SUM(p.payment_amount), 0)
         ) as discrepancy
       FROM orders o
       LEFT JOIN payments p ON o.order_id = p.order_id
       WHERE DATE(o.order_date) = DATE('now')
-    
+
     assertion: "discrepancy < 100"  # Allow $100 discrepancy
   
   - name: "Active Orders Without Items Check"
@@ -360,13 +360,12 @@ tests:
     type: custom_sql
     severity: MEDIUM
     tags: [orders, metrics, revenue]
-    
+
     query: |
-      SELECT AVG(order_total) as avg_order_value
+      SELECT COALESCE(AVG(order_total), 0) as avg_order_value
       FROM orders
-      WHERE DATE(order_date) >= DATE('now', '-7 days')
-        AND status = 'completed'
-    
+      WHERE status = 'completed'
+
     assertion: "avg_order_value >= 50"
 
 # ============================================================================

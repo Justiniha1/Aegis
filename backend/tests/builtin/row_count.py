@@ -1,5 +1,36 @@
 from backend.core.database_connector import DatabaseConnector
 
+#look into oracle
+def _date_where(dialect: str, date_column: str, timeframe: str) -> str:
+    if timeframe == "daily":
+        if dialect == "sqlite":
+            return f"WHERE DATE({date_column}) = DATE('now')"
+        elif dialect in ("postgresql", "postgres"):
+            return f"WHERE {date_column}::date = CURRENT_DATE"
+        elif dialect == "mysql":
+            return f"WHERE DATE({date_column}) = CURDATE()"
+        elif dialect == "mssql":
+            return f"WHERE CAST({date_column} AS DATE) = CAST(GETDATE() AS DATE)"
+    elif timeframe == "weekly":
+        if dialect == "sqlite":
+            return f"WHERE {date_column} >= DATE('now', '-7 days')"
+        elif dialect in ("postgresql", "postgres"):
+            return f"WHERE {date_column} >= CURRENT_DATE - INTERVAL '7 days'"
+        elif dialect == "mysql":
+            return f"WHERE {date_column} >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)"
+        elif dialect == "mssql":
+            return f"WHERE {date_column} >= DATEADD(day, -7, CAST(GETDATE() AS DATE))"
+    elif timeframe == "monthly":
+        if dialect == "sqlite":
+            return f"WHERE {date_column} >= DATE('now', '-30 days')"
+        elif dialect in ("postgresql", "postgres"):
+            return f"WHERE {date_column} >= CURRENT_DATE - INTERVAL '30 days'"
+        elif dialect == "mysql":
+            return f"WHERE {date_column} >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)"
+        elif dialect == "mssql":
+            return f"WHERE {date_column} >= DATEADD(day, -30, CAST(GETDATE() AS DATE))"
+    return ""
+
 
 def run(connector: DatabaseConnector, test: dict) -> dict:
     table = test["table"]
@@ -10,12 +41,8 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
 
     where_clause = ""
     if timeframe != "all_time" and date_column:
-        if timeframe == "daily":
-            where_clause = f"WHERE DATE({date_column}) = DATE('now')"
-        elif timeframe == "weekly":
-            where_clause = f"WHERE {date_column} >= DATE('now', '-7 days')"
-        elif timeframe == "monthly":
-            where_clause = f"WHERE {date_column} >= DATE('now', '-30 days')"
+        dialect = connector.get_sqlalchemy_engine().dialect.name
+        where_clause = _date_where(dialect, date_column, timeframe)
 
     df = connector.execute_query(
         f"SELECT COUNT(*) AS row_count FROM {table} {where_clause}"

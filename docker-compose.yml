@@ -1,0 +1,31 @@
+services:
+
+  # ─── Dashboard API (your infrastructure) ────────────────────────────────────
+  api:
+    build:
+      context: ./dashboard_api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./dashboard.db:/app/dashboard.db
+    environment:
+      DATABASE_URL: sqlite:////app/dashboard.db
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ─── Backend Test Engine (runs on client's server in prod) ──────────────────
+  engine:
+    build:
+      context: ./backend
+    volumes:
+      - ./backend/config:/app/backend/config
+      - ./data:/app/data
+    environment:
+      DQF_API_URL: http://api:8000
+      DQF_API_KEY: ${DQF_API_KEY}
+    depends_on:
+      api:
+        condition: service_healthy
