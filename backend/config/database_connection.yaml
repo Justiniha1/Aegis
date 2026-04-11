@@ -19,7 +19,7 @@
 #Local development database:
 dev:
   type: sqlite
-  database: ../../data/dev_database.db
+  path: ../../data/raw/sample_ecommerce.db
 
 
 # ----------------------------------------------------------------------------

@@ -1,0 +1,12 @@
+.git
+.claude
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+venv
+*.egg-info
+data/processed
+dashboard.db
