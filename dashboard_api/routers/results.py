@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from dashboard_api import models, schemas
-from dashboard_api.auth import get_current_client
+from dashboard_api.auth import get_client_any_auth, get_current_client
 from dashboard_api.database import get_db
 
 router = APIRouter(prefix="/api/v1/results", tags=["results"])
@@ -46,12 +46,12 @@ def get_results(
     status: Optional[str] = Query(None, description="Filter by status: PASSED, FAILED, ERROR, SKIPPED"),
     test_type: Optional[str] = Query(None, description="Filter by test type: null_check, duplicate_check, etc."),
     limit: int = Query(100, le=1000, description="Max results to return"),
-    client=Depends(get_current_client),
+    client=Depends(get_client_any_auth),
     db: Session = Depends(get_db),
 ):
     """
     Retrieve test results for the authenticated client.
-    Results are ordered newest first.
+    Accepts API key or JWT. Results are ordered newest first.
     """
     q = db.query(models.TestResult).filter(models.TestResult.client_id == client.id)
 
