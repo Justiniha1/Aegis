@@ -1,8 +1,10 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel
 
+Status = Literal["PASSED", "FAILED", "ERROR", "SKIPPED"]
+Severity = Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
 
 # ── Inbound — what the backend engine sends ──────────────────────────────────
 
@@ -10,8 +12,8 @@ class TestResultIn(BaseModel):
     test_id: str
     name: str
     type: str
-    status: str
-    severity: str
+    status: Status
+    severity: Severity
     metrics: dict
     message: str
 
@@ -76,7 +78,7 @@ class TestDefinitionIn(BaseModel):
     name: str
     description: Optional[str] = None
     type: str
-    severity: str = "MEDIUM"
+    severity: Severity = "MEDIUM"
     enabled: bool = True
     tags: list[str] = []
     config: dict                   # type-specific fields: table, column, threshold, etc.

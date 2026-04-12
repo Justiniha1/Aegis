@@ -36,7 +36,12 @@ def get_current_client(
 
 # ── JWT auth (used by the frontend) ──────────────────────────────────────────
 
-_SECRET = os.getenv("JWT_SECRET_KEY", "dev-secret-change-in-prod")
+_SECRET = os.getenv("JWT_SECRET_KEY", "")
+if not _SECRET:
+    import secrets as _s
+    _SECRET = _s.token_hex(32)
+    import warnings
+    warnings.warn("JWT_SECRET_KEY not set — using random key (tokens won't survive restarts)", stacklevel=1)
 _ALGORITHM = "HS256"
 _EXPIRE_HOURS = 24
 

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, JSON, String
 from sqlalchemy.orm import relationship
 
 from dashboard_api.database import Base
@@ -24,7 +24,7 @@ class TestResult(Base):
     __tablename__ = "test_results"
 
     id = Column(Integer, primary_key=True)
-    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False, index=True)
     test_id = Column(String, nullable=False)
     test_name = Column(String, nullable=False)
     test_type = Column(String, nullable=False)
@@ -32,7 +32,9 @@ class TestResult(Base):
     severity = Column(String, nullable=False)     # LOW / MEDIUM / HIGH / CRITICAL
     metrics = Column(JSON)
     message = Column(String)
-    run_at = Column(DateTime, nullable=False)
+    run_at = Column(DateTime, nullable=False, index=True)
+
+    __table_args__ = (Index("ix_results_client_run", "client_id", "run_at"),)
 
     client = relationship("Client", back_populates="results")
 

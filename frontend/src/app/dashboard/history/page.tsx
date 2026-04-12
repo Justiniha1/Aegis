@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
@@ -34,23 +34,25 @@ export default function HistoryPage() {
     );
   }
 
-  // Group results by run_at timestamp
-  const runMap = new Map<string, TestResult[]>();
-  for (const r of results) {
-    const existing = runMap.get(r.run_at) || [];
-    existing.push(r);
-    runMap.set(r.run_at, existing);
-  }
-
-  const runs: RunSummary[] = Array.from(runMap.entries())
-    .map(([run_at, items]) => ({
-      run_at,
-      total: items.length,
-      passed: items.filter((i) => i.status === "PASSED").length,
-      failed: items.filter((i) => i.status === "FAILED").length,
-      errors: items.filter((i) => i.status === "ERROR").length,
-    }))
-    .sort((a, b) => new Date(b.run_at).getTime() - new Date(a.run_at).getTime());
+  // Group results by run_at timestamp (memoized)
+  const { runMap, runs } = useMemo(() => {
+    const map = new Map<string, TestResult[]>();
+    for (const r of results) {
+      const existing = map.get(r.run_at) || [];
+      existing.push(r);
+      map.set(r.run_at, existing);
+    }
+    const summaries: RunSummary[] = Array.from(map.entries())
+      .map(([run_at, items]) => ({
+        run_at,
+        total: items.length,
+        passed: items.filter((i) => i.status === "PASSED").length,
+        failed: items.filter((i) => i.status === "FAILED").length,
+        errors: items.filter((i) => i.status === "ERROR").length,
+      }))
+      .sort((a, b) => new Date(b.run_at).getTime() - new Date(a.run_at).getTime());
+    return { runMap: map, runs: summaries };
+  }, [results]);
 
   const selectedResults = selectedRun ? runMap.get(selectedRun) || [] : [];
 

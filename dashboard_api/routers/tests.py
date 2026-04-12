@@ -1,4 +1,4 @@
-import re
+from datetime import datetime
 
 import yaml
 from fastapi import APIRouter, Depends, HTTPException
@@ -10,9 +10,6 @@ from dashboard_api.database import get_db
 
 router = APIRouter(prefix="/api/v1/tests", tags=["tests"])
 
-
-def _name_to_id(name: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
 
 
 @router.get("", response_model=list[schemas.TestDefinitionOut])
@@ -66,7 +63,6 @@ def update_test(
     for key, value in body.model_dump().items():
         setattr(test, key, value)
 
-    from datetime import datetime
     test.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(test)

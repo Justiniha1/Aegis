@@ -10,6 +10,7 @@ services:
       - ./db_data:/app/db_data
     environment:
       DATABASE_URL: sqlite:////app/db_data/dashboard.db
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-local-dev-secret-do-not-use-in-prod}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
       interval: 120s

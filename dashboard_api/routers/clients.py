@@ -4,26 +4,26 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from dashboard_api import models, schemas
-from dashboard_api.auth import get_current_client, get_current_client_jwt, hash_key, hash_password
+from dashboard_api.auth import get_client_any_auth, get_current_client, hash_key, hash_password
 from dashboard_api.database import get_db
 
 router = APIRouter(prefix="/api/v1/clients", tags=["clients"])
 
 
 @router.get("", response_model=list[schemas.ClientOut])
-def list_clients(db: Session = Depends(get_db), _=Depends(get_current_client)):
-    """List all registered clients. API keys are not returned."""
-    return db.query(models.Client).order_by(models.Client.created_at.desc()).all()
+def list_clients(db: Session = Depends(get_db), current=Depends(get_client_any_auth)):
+    """Return the authenticated client's own info. API keys are not returned."""
+    return [current]
 
 
 @router.delete("/{client_id}", status_code=204)
-def delete_client(client_id: int, db: Session = Depends(get_db), _=Depends(get_current_client)):
-    """Delete a client and all their test results. Revokes their API key."""
-    client = db.query(models.Client).filter(models.Client.id == client_id).first()
-    if not client:
-        raise HTTPException(status_code=404, detail=f"Client {client_id} not found")
+def delete_client(client_id: int, db: Session = Depends(get_db), current=Depends(get_client_any_auth)):
+    """Delete a client and all their test results. Only the client themselves can delete their account."""
+    if current.id != client_id:
+        raise HTTPException(status_code=403, detail="You can only delete your own account")
     db.query(models.TestResult).filter(models.TestResult.client_id == client_id).delete()
-    db.delete(client)
+    db.query(models.TestDefinition).filter(models.TestDefinition.client_id == client_id).delete()
+    db.delete(current)
     db.commit()
 
 
