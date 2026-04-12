@@ -54,9 +54,9 @@ function ChartTooltip({ active, payload, label, level }: any) {
   if (!active || !payload?.length) return null;
   const count = payload[0].value;
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 shadow-xl">
-      <p className="text-white font-medium text-sm">{label}</p>
-      <p className="text-gray-400 text-xs mt-1">
+    <div className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 shadow-xl text-white">
+      <p className="font-medium text-sm">{label}</p>
+      <p className="text-gray-300 text-xs mt-1">
         {count} test{count !== 1 ? "s" : ""}
       </p>
       {level !== "detail" && (
@@ -201,7 +201,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-pulse text-gray-500">Loading results…</div>
+        <div className={`animate-pulse ${dark ? "text-gray-500" : "text-gray-400"}`}>Loading results…</div>
       </div>
     );
   }
@@ -276,7 +276,7 @@ export default function DashboardPage() {
               </button>
             ))}
           </div>
-          <p className="text-gray-600 text-xs">
+          <p className={`text-xs ${dark ? "text-gray-600" : "text-gray-400"}`}>
             Showing {chartResults.length} test{chartResults.length !== 1 ? "s" : ""}
           </p>
         </div>
@@ -286,22 +286,28 @@ export default function DashboardPage() {
           {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-sm">
             {drillLevel !== "type" && (
-              <button onClick={handleBack} className="text-gray-500 hover:text-white mr-1 transition-colors">
+              <button onClick={handleBack} className={`mr-1 transition-colors ${dark ? "text-gray-500 hover:text-white" : "text-gray-400 hover:text-gray-900"}`}>
                 ←
               </button>
             )}
             <button
               onClick={() => { setSelectedType(null); setSelectedTable(null); }}
-              className={drillLevel === "type" ? "text-white font-semibold" : "text-gray-500 hover:text-gray-300 transition-colors"}
+              className={drillLevel === "type"
+                ? dark ? "text-white font-semibold" : "text-gray-900 font-semibold"
+                : dark ? "text-gray-500 hover:text-gray-300 transition-colors" : "text-gray-400 hover:text-gray-700 transition-colors"
+              }
             >
-              All Issues
+              {statusFilter === "passing" ? "Passing Tests" : statusFilter === "all" ? "All Tests" : "Issues"}
             </button>
             {selectedType && (
               <>
-                <span className="text-gray-700">/</span>
+                <span className={dark ? "text-gray-700" : "text-gray-300"}>/</span>
                 <button
                   onClick={() => setSelectedTable(null)}
-                  className={drillLevel === "table" ? "text-white font-semibold" : "text-gray-500 hover:text-gray-300 transition-colors"}
+                  className={drillLevel === "table"
+                    ? dark ? "text-white font-semibold" : "text-gray-900 font-semibold"
+                    : dark ? "text-gray-500 hover:text-gray-300 transition-colors" : "text-gray-400 hover:text-gray-700 transition-colors"
+                  }
                 >
                   {selectedType.replace(/_/g, " ")}
                 </button>
@@ -309,15 +315,15 @@ export default function DashboardPage() {
             )}
             {selectedTable && (
               <>
-                <span className="text-gray-700">/</span>
-                <span className="text-white font-semibold">{selectedTable}</span>
+                <span className={dark ? "text-gray-700" : "text-gray-300"}>/</span>
+                <span className={dark ? "text-white font-semibold" : "text-gray-900 font-semibold"}>{selectedTable}</span>
               </>
             )}
           </div>
 
           {/* Severity filter pills */}
           <div className="flex items-center gap-2">
-            <span className="text-gray-600 text-xs mr-1">Filter:</span>
+            <span className={`text-xs mr-1 ${dark ? "text-gray-600" : "text-gray-400"}`}>Filter:</span>
             <FilterPill
               label="All"
               count={Object.values(severityCounts).reduce((a, b) => a + b, 0)}
@@ -378,7 +384,7 @@ export default function DashboardPage() {
                 <p className={`text-lg font-medium ${statusFilter === "issues" ? "text-green-400" : "text-gray-500"}`}>
                   {statusFilter === "issues" ? "All tests passing" : "No tests match this filter"}
                 </p>
-                <p className="text-gray-600 text-sm">
+                <p className={`text-sm ${dark ? "text-gray-600" : "text-gray-400"}`}>
                   {statusFilter === "issues" ? "No issues detected in the latest run" : "Try changing the filter above"}
                 </p>
               </div>
@@ -416,8 +422,8 @@ export default function DashboardPage() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-48 text-gray-500">
-                No issues for this filter combination
+              <div className={`flex items-center justify-center h-48 ${dark ? "text-gray-500" : "text-gray-400"}`}>
+                No tests for this filter combination
               </div>
             )
           )}
@@ -427,8 +433,8 @@ export default function DashboardPage() {
               {detailResults.length > 0 ? (
                 detailResults.map((r) => <DetailCard key={r.id} result={r} />)
               ) : (
-                <div className="flex items-center justify-center h-48 text-gray-500">
-                  No issues match the current filter
+                <div className={`flex items-center justify-center h-48 ${dark ? "text-gray-500" : "text-gray-400"}`}>
+                  No tests match the current filter
                 </div>
               )}
             </div>
@@ -607,9 +613,9 @@ function ResultsTable({ results, summary }: { results: TestResult[]; summary: { 
                       <td colSpan={8} className={`px-12 py-3 ${dark ? "bg-gray-800/20" : "bg-gray-50"}`}>
                         <div className="grid grid-cols-4 gap-3">
                           {metricEntries.map(([key, val]) => (
-                            <div key={key} className="bg-gray-900/50 rounded-lg px-3 py-2">
-                              <p className="text-gray-500 text-xs">{key.replace(/_/g, " ")}</p>
-                              <p className="text-white text-sm font-medium mt-0.5">
+                            <div key={key} className={`rounded-lg px-3 py-2 ${dark ? "bg-gray-900/50" : "bg-white border border-gray-200"}`}>
+                              <p className={`text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>{key.replace(/_/g, " ")}</p>
+                              <p className={`text-sm font-medium mt-0.5 ${dark ? "text-white" : "text-gray-900"}`}>
                                 {typeof val === "number"
                                   ? val < 1 && val > 0
                                     ? `${(val * 100).toFixed(1)}%`
@@ -633,6 +639,8 @@ function ResultsTable({ results, summary }: { results: TestResult[]; summary: { 
 }
 
 function DetailCard({ result: r }: { result: TestResult }) {
+  const { theme } = useTheme();
+  const dark = theme === "dark";
   const [expanded, setExpanded] = useState(false);
   const metrics = r.metrics || {};
   const table = extractTable(r);
@@ -643,13 +651,17 @@ function DetailCard({ result: r }: { result: TestResult }) {
 
   return (
     <div
-      className="bg-gray-800/50 border border-gray-700/50 rounded-lg p-4 hover:border-gray-600 transition-colors cursor-pointer"
+      className={`border rounded-lg p-4 transition-colors cursor-pointer ${
+        dark
+          ? "bg-gray-800/50 border-gray-700/50 hover:border-gray-600"
+          : "bg-gray-50 border-gray-200 hover:border-gray-300"
+      }`}
       onClick={() => setExpanded(!expanded)}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="text-gray-600 text-xs">{expanded ? "▼" : "▶"}</span>
-          <span className="text-white font-medium">{r.test_name}</span>
+          <span className={`text-xs ${dark ? "text-gray-600" : "text-gray-400"}`}>{expanded ? "▼" : "▶"}</span>
+          <span className={`font-medium ${dark ? "text-white" : "text-gray-900"}`}>{r.test_name}</span>
         </div>
         <div className="flex gap-2">
           <StatusBadge status={r.status} />
@@ -660,27 +672,27 @@ function DetailCard({ result: r }: { result: TestResult }) {
       {/* Table + column info */}
       <div className="flex items-center gap-4 mt-2 ml-6">
         {table !== "—" && (
-          <span className="text-xs text-gray-500">
-            Table: <span className="text-gray-300 font-mono">{table}</span>
+          <span className={`text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>
+            Table: <span className={`font-mono ${dark ? "text-gray-300" : "text-gray-700"}`}>{table}</span>
           </span>
         )}
         {columns !== "—" && (
-          <span className="text-xs text-gray-500">
-            Column{columns.includes(",") ? "s" : ""}: <span className="text-gray-300 font-mono">{columns}</span>
+          <span className={`text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>
+            Column{columns.includes(",") ? "s" : ""}: <span className={`font-mono ${dark ? "text-gray-300" : "text-gray-700"}`}>{columns}</span>
           </span>
         )}
       </div>
 
       {r.message && (
-        <p className="text-gray-400 text-sm mt-1.5 ml-6">{r.message}</p>
+        <p className={`text-sm mt-1.5 ml-6 ${dark ? "text-gray-400" : "text-gray-500"}`}>{r.message}</p>
       )}
 
       {expanded && metricEntries.length > 0 && (
         <div className="mt-3 ml-6 grid grid-cols-3 gap-3">
           {metricEntries.map(([key, val]) => (
-            <div key={key} className="bg-gray-900/50 rounded-lg px-3 py-2">
-              <p className="text-gray-500 text-xs">{key.replace(/_/g, " ")}</p>
-              <p className="text-white text-sm font-medium mt-0.5">
+            <div key={key} className={`rounded-lg px-3 py-2 ${dark ? "bg-gray-900/50" : "bg-white border border-gray-200"}`}>
+              <p className={`text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>{key.replace(/_/g, " ")}</p>
+              <p className={`text-sm font-medium mt-0.5 ${dark ? "text-white" : "text-gray-900"}`}>
                 {typeof val === "number"
                   ? val < 1 && val > 0
                     ? `${(val * 100).toFixed(1)}%`

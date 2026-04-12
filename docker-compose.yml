@@ -7,14 +7,26 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./dashboard.db:/app/dashboard.db
+      - ./db_data:/app/db_data
     environment:
-      DATABASE_URL: sqlite:////app/dashboard.db
+      DATABASE_URL: sqlite:////app/db_data/dashboard.db
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
       interval: 120s
       timeout: 5s
       retries: 3
+
+  # ─── Frontend Dashboard (your infrastructure) ───────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
 
   # ─── Backend Test Engine (runs on client's server in prod) ──────────────────
   engine:
