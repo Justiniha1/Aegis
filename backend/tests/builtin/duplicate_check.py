@@ -6,6 +6,7 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
     if not table:
         return _error(test, "Missing required field: table")
 
+    # Support both 'column' (singular) and 'columns' (list)
     raw_cols = test.get("columns") or [test.get("column")]
     columns = [c for c in raw_cols if c]
     if not columns:
