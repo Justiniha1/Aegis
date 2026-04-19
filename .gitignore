@@ -4,3 +4,4 @@ __pycache__/
 data/processed/
 .env
 dashboard.db
+db_data/
