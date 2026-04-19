@@ -52,6 +52,7 @@ def get_results(
     """
     Retrieve test results for the authenticated client.
     Accepts API key or JWT. Results are ordered newest first.
+    Enriches each result with table/column from the matching TestDefinition config.
     """
     q = db.query(models.TestResult).filter(models.TestResult.client_id == client.id)
 
@@ -60,4 +61,30 @@ def get_results(
     if test_type:
         q = q.filter(models.TestResult.test_type == test_type)
 
-    return q.order_by(models.TestResult.run_at.desc()).limit(limit).all()
+    results = q.order_by(models.TestResult.run_at.desc()).limit(limit).all()
+
+    # Build a lookup of test_name → (table, column) from TestDefinitions
+    names = {r.test_name for r in results}
+    test_defs = (
+        db.query(models.TestDefinition)
+        .filter(
+            models.TestDefinition.client_id == client.id,
+            models.TestDefinition.name.in_(names),
+        )
+        .all()
+    )
+    def_lookup: dict[str, dict] = {td.name: td.config or {} for td in test_defs}
+
+    # Build enriched response dicts
+    enriched = []
+    for r in results:
+        cfg = def_lookup.get(r.test_name, {})
+        d = schemas.TestResultOut.model_validate(r)
+        d.table = cfg.get("table") or cfg.get("ref_table")
+        col = cfg.get("column") or cfg.get("columns")
+        if isinstance(col, list):
+            col = ", ".join(str(c) for c in col)
+        d.column = col
+        enriched.append(d)
+
+    return enriched

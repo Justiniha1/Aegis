@@ -26,15 +26,7 @@ export default function HistoryPage() {
       .finally(() => setLoading(false));
   }, [token, authLoading, router]);
 
-  if (loading || authLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className={dark ? "text-gray-400" : "text-gray-500"}>Loading history...</p>
-      </div>
-    );
-  }
-
-  // Group results by run_at timestamp (memoized)
+  // Group results by run_at timestamp (memoized) — must be before any early returns
   const { runMap, runs } = useMemo(() => {
     const map = new Map<string, TestResult[]>();
     for (const r of results) {
@@ -55,6 +47,14 @@ export default function HistoryPage() {
   }, [results]);
 
   const selectedResults = selectedRun ? runMap.get(selectedRun) || [] : [];
+
+  if (loading || authLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className={dark ? "text-gray-400" : "text-gray-500"}>Loading history...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

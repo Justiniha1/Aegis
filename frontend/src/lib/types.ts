@@ -8,6 +8,8 @@ export interface TestResult {
   metrics: Record<string, unknown>;
   message: string;
   run_at: string;
+  table: string | null;
+  column: string | null;
 }
 
 export interface TestDefinition {

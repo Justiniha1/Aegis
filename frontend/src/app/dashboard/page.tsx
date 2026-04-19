@@ -86,12 +86,16 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   // Drill state
+  const [drillMode, setDrillMode] = useState<"type" | "table">("type");
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
+  const [selectedTableFirst, setSelectedTableFirst] = useState<string | null>(null);
+  const [selectedTypeSecond, setSelectedTypeSecond] = useState<string | null>(null);
   const [severityFilter, setSeverityFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | "issues" | "passing">("issues");
 
   const drillLevel = selectedTable ? "detail" : selectedType ? "table" : "type";
+  const tableDrillLevel = selectedTypeSecond ? "detail" : selectedTableFirst ? "typeInTable" : "tableList";
 
   useEffect(() => {
     if (authLoading) return;
@@ -161,15 +165,11 @@ export default function DashboardPage() {
     const groups: Record<string, TestResult[]> = {};
     for (const r of chartResults) {
       if (r.test_type !== selectedType) continue;
-      const table = (r.metrics?.table as string) || r.test_name;
+      const table = r.table || r.test_name;
       (groups[table] ??= []).push(r);
     }
     return Object.entries(groups)
-      .map(([name, items]) => ({
-        name,
-        count: items.length,
-        severity: worstSeverity(items),
-      }))
+      .map(([name, items]) => ({ name, count: items.length, severity: worstSeverity(items) }))
       .sort((a, b) => b.count - a.count);
   }, [chartResults, selectedType]);
 
@@ -177,10 +177,45 @@ export default function DashboardPage() {
   const detailResults = useMemo(() => {
     if (!selectedTable || !selectedType) return [];
     return chartResults.filter((r) => {
-      const table = (r.metrics?.table as string) || r.test_name;
+      const table = r.table || r.test_name;
       return r.test_type === selectedType && table === selectedTable;
     });
   }, [chartResults, selectedType, selectedTable]);
+
+  // "By Table" Level 1: all tables grouped
+  const tableFirstChartData = useMemo(() => {
+    const groups: Record<string, TestResult[]> = {};
+    for (const r of chartResults) {
+      const table = r.table || r.test_name;
+      (groups[table] ??= []).push(r);
+    }
+    return Object.entries(groups)
+      .map(([name, items]) => ({ name, count: items.length, severity: worstSeverity(items) }))
+      .sort((a, b) => b.count - a.count);
+  }, [chartResults]);
+
+  // "By Table" Level 2: error types within selected table
+  const typeInTableChartData = useMemo(() => {
+    if (!selectedTableFirst) return [];
+    const groups: Record<string, TestResult[]> = {};
+    for (const r of chartResults) {
+      const table = r.table || r.test_name;
+      if (table !== selectedTableFirst) continue;
+      (groups[r.test_type] ??= []).push(r);
+    }
+    return Object.entries(groups)
+      .map(([name, items]) => ({ name: name.replace(/_/g, " "), rawName: name, count: items.length, severity: worstSeverity(items) }))
+      .sort((a, b) => b.count - a.count);
+  }, [chartResults, selectedTableFirst]);
+
+  // "By Table" Level 3: detail rows
+  const detailResultsTableFirst = useMemo(() => {
+    if (!selectedTableFirst || !selectedTypeSecond) return [];
+    return chartResults.filter((r) => {
+      const table = r.table || r.test_name;
+      return table === selectedTableFirst && r.test_type === selectedTypeSecond;
+    });
+  }, [chartResults, selectedTableFirst, selectedTypeSecond]);
 
   /* ── severity filter counts (for the filter pills) ─────────────────── */
   const severityCounts = useMemo(() => {
@@ -194,8 +229,20 @@ export default function DashboardPage() {
 
   /* ── handlers ──────────────────────────────────────────────────────── */
   const handleBack = () => {
-    if (selectedTable) setSelectedTable(null);
-    else if (selectedType) setSelectedType(null);
+    if (drillMode === "type") {
+      if (selectedTable) setSelectedTable(null);
+      else if (selectedType) setSelectedType(null);
+    } else {
+      if (selectedTypeSecond) setSelectedTypeSecond(null);
+      else if (selectedTableFirst) setSelectedTableFirst(null);
+    }
+  };
+
+  const resetDrill = () => {
+    setSelectedType(null);
+    setSelectedTable(null);
+    setSelectedTableFirst(null);
+    setSelectedTypeSecond(null);
   };
 
   if (loading) {
@@ -246,7 +293,7 @@ export default function DashboardPage() {
 
         {/* Summary cards */}
         <div className="col-span-9 grid grid-cols-4 gap-4">
-          <SummaryCard label="Total Tests" value={summary.total} color={dark ? "text-white" : "text-gray-900"} icon="📋" dark={dark} />
+          <SummaryCard label="Total Tests" value={summary.total} color={dark ? "text-white" : "text-gray-900"} icon="" dark={dark} />
           <SummaryCard label="Passed" value={summary.passed} color="text-green-400" icon="✓" accent="bg-green-500/10 border-green-500/20" dark={dark} />
           <SummaryCard label="Failed" value={summary.failed} color="text-red-400" icon="✗" accent="bg-red-500/10 border-red-500/20" dark={dark} />
           <SummaryCard label="Errors" value={summary.errors} color="text-yellow-400" icon="⚠" accent="bg-yellow-500/10 border-yellow-500/20" dark={dark} />
@@ -255,7 +302,7 @@ export default function DashboardPage() {
 
       {/* ── Drill-down chart ───────────────────────────────────────────── */}
       <div className={`rounded-xl border p-6 ${dark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"}`}>
-        {/* Status toggle */}
+        {/* Status toggle + View-by toggle */}
         <div className="flex items-center justify-between mb-4">
           <div className={`flex items-center rounded-lg p-0.5 gap-0.5 ${dark ? "bg-gray-800" : "bg-gray-100"}`}>
             {([
@@ -265,7 +312,7 @@ export default function DashboardPage() {
             ] as ["issues" | "all" | "passing", string, number][]).map(([key, label, count]) => (
               <button
                 key={key}
-                onClick={() => { setStatusFilter(key); setSelectedType(null); setSelectedTable(null); }}
+                onClick={() => { setStatusFilter(key); resetDrill(); }}
                 className={`text-xs px-3 py-1.5 rounded-md transition-all ${
                   statusFilter === key
                     ? dark ? "bg-gray-700 text-white font-medium" : "bg-white text-gray-900 font-medium shadow-sm"
@@ -276,30 +323,47 @@ export default function DashboardPage() {
               </button>
             ))}
           </div>
-          <p className={`text-xs ${dark ? "text-gray-600" : "text-gray-400"}`}>
-            Showing {chartResults.length} test{chartResults.length !== 1 ? "s" : ""}
-          </p>
+          <div className="flex items-center gap-3">
+            <span className={`text-xs ${dark ? "text-gray-600" : "text-gray-400"}`}>View by:</span>
+            <div className={`flex items-center rounded-lg p-0.5 gap-0.5 ${dark ? "bg-gray-800" : "bg-gray-100"}`}>
+              {([["type", "Error Type"], ["table", "Table"]] as ["type" | "table", string][]).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => { setDrillMode(key); resetDrill(); }}
+                  className={`text-xs px-3 py-1.5 rounded-md transition-all ${
+                    drillMode === key
+                      ? dark ? "bg-gray-700 text-white font-medium" : "bg-white text-gray-900 font-medium shadow-sm"
+                      : dark ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-900"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Breadcrumb + severity filter */}
         <div className="flex items-center justify-between mb-5">
           {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-sm">
-            {drillLevel !== "type" && (
+            {((drillMode === "type" && drillLevel !== "type") || (drillMode === "table" && tableDrillLevel !== "tableList")) && (
               <button onClick={handleBack} className={`mr-1 transition-colors ${dark ? "text-gray-500 hover:text-white" : "text-gray-400 hover:text-gray-900"}`}>
                 ←
               </button>
             )}
             <button
-              onClick={() => { setSelectedType(null); setSelectedTable(null); }}
-              className={drillLevel === "type"
+              onClick={resetDrill}
+              className={(drillMode === "type" ? drillLevel === "type" : tableDrillLevel === "tableList")
                 ? dark ? "text-white font-semibold" : "text-gray-900 font-semibold"
                 : dark ? "text-gray-500 hover:text-gray-300 transition-colors" : "text-gray-400 hover:text-gray-700 transition-colors"
               }
             >
               {statusFilter === "passing" ? "Passing Tests" : statusFilter === "all" ? "All Tests" : "Issues"}
             </button>
-            {selectedType && (
+
+            {/* By Type breadcrumb */}
+            {drillMode === "type" && selectedType && (
               <>
                 <span className={dark ? "text-gray-700" : "text-gray-300"}>/</span>
                 <button
@@ -313,10 +377,32 @@ export default function DashboardPage() {
                 </button>
               </>
             )}
-            {selectedTable && (
+            {drillMode === "type" && selectedTable && (
               <>
                 <span className={dark ? "text-gray-700" : "text-gray-300"}>/</span>
                 <span className={dark ? "text-white font-semibold" : "text-gray-900 font-semibold"}>{selectedTable}</span>
+              </>
+            )}
+
+            {/* By Table breadcrumb */}
+            {drillMode === "table" && selectedTableFirst && (
+              <>
+                <span className={dark ? "text-gray-700" : "text-gray-300"}>/</span>
+                <button
+                  onClick={() => setSelectedTypeSecond(null)}
+                  className={tableDrillLevel === "typeInTable"
+                    ? dark ? "text-white font-semibold" : "text-gray-900 font-semibold"
+                    : dark ? "text-gray-500 hover:text-gray-300 transition-colors" : "text-gray-400 hover:text-gray-700 transition-colors"
+                  }
+                >
+                  {selectedTableFirst}
+                </button>
+              </>
+            )}
+            {drillMode === "table" && selectedTypeSecond && (
+              <>
+                <span className={dark ? "text-gray-700" : "text-gray-300"}>/</span>
+                <span className={dark ? "text-white font-semibold" : "text-gray-900 font-semibold"}>{selectedTypeSecond.replace(/_/g, " ")}</span>
               </>
             )}
           </div>
@@ -348,102 +434,136 @@ export default function DashboardPage() {
 
         {/* Chart area */}
         <div className="transition-all duration-300">
-          {drillLevel === "type" && (
+
+          {/* ── By Error Type mode ── */}
+          {drillMode === "type" && drillLevel === "type" && (
             typeChartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={320}>
-                <BarChart data={typeChartData} barCategoryGap="25%">
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fill: dark ? "#9ca3af" : "#6b7280", fontSize: 12 }}
-                    axisLine={{ stroke: dark ? "#374151" : "#d1d5db" }}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fill: dark ? "#9ca3af" : "#6b7280", fontSize: 12 }}
-                    axisLine={false}
-                    tickLine={false}
-                    allowDecimals={false}
-                  />
-                  <Tooltip content={<ChartTooltip level="type" />} cursor={{ fill: dark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.04)" }} />
-                  <Bar
-                    dataKey="count"
-                    radius={[8, 8, 0, 0]}
-                    cursor="pointer"
-                    animationDuration={600}
-                    onClick={(_: unknown, index: number) => setSelectedType(typeChartData[index].rawName)}
-                  >
-                    {typeChartData.map((d, i) => (
-                      <Cell key={i} fill={BAR_COLORS[d.severity] || "#6b7280"} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <DrillBarChart
+                data={typeChartData}
+                dark={dark}
+                level="type"
+                onBarClick={(d, i) => setSelectedType(typeChartData[i].rawName)}
+              />
             ) : (
-              <div className="flex flex-col items-center justify-center h-48 gap-2">
-                <span className="text-4xl">{statusFilter === "issues" ? "✓" : "—"}</span>
-                <p className={`text-lg font-medium ${statusFilter === "issues" ? "text-green-400" : "text-gray-500"}`}>
-                  {statusFilter === "issues" ? "All tests passing" : "No tests match this filter"}
-                </p>
-                <p className={`text-sm ${dark ? "text-gray-600" : "text-gray-400"}`}>
-                  {statusFilter === "issues" ? "No issues detected in the latest run" : "Try changing the filter above"}
-                </p>
-              </div>
+              <EmptyChart statusFilter={statusFilter} dark={dark} />
             )
           )}
-
-          {drillLevel === "table" && (
+          {drillMode === "type" && drillLevel === "table" && (
             tableChartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={320}>
-                <BarChart data={tableChartData} barCategoryGap="25%">
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fill: dark ? "#9ca3af" : "#6b7280", fontSize: 12 }}
-                    axisLine={{ stroke: dark ? "#374151" : "#d1d5db" }}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fill: dark ? "#9ca3af" : "#6b7280", fontSize: 12 }}
-                    axisLine={false}
-                    tickLine={false}
-                    allowDecimals={false}
-                  />
-                  <Tooltip content={<ChartTooltip level="table" />} cursor={{ fill: dark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.04)" }} />
-                  <Bar
-                    dataKey="count"
-                    radius={[8, 8, 0, 0]}
-                    cursor="pointer"
-                    animationDuration={600}
-                    onClick={(_: unknown, index: number) => setSelectedTable(tableChartData[index].name)}
-                  >
-                    {tableChartData.map((d, i) => (
-                      <Cell key={i} fill={BAR_COLORS[d.severity] || "#6b7280"} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <DrillBarChart
+                data={tableChartData}
+                dark={dark}
+                level="table"
+                onBarClick={(d, i) => setSelectedTable(tableChartData[i].name)}
+              />
             ) : (
               <div className={`flex items-center justify-center h-48 ${dark ? "text-gray-500" : "text-gray-400"}`}>
                 No tests for this filter combination
               </div>
             )
           )}
+          {drillMode === "type" && drillLevel === "detail" && (
+            <DetailList results={detailResults} dark={dark} />
+          )}
 
-          {drillLevel === "detail" && (
-            <div className="space-y-3 max-h-[400px] overflow-auto pr-2">
-              {detailResults.length > 0 ? (
-                detailResults.map((r) => <DetailCard key={r.id} result={r} />)
-              ) : (
-                <div className={`flex items-center justify-center h-48 ${dark ? "text-gray-500" : "text-gray-400"}`}>
-                  No tests match the current filter
-                </div>
-              )}
-            </div>
+          {/* ── By Table mode ── */}
+          {drillMode === "table" && tableDrillLevel === "tableList" && (
+            tableFirstChartData.length > 0 ? (
+              <DrillBarChart
+                data={tableFirstChartData}
+                dark={dark}
+                level="type"
+                onBarClick={(d, i) => setSelectedTableFirst(tableFirstChartData[i].name)}
+              />
+            ) : (
+              <EmptyChart statusFilter={statusFilter} dark={dark} />
+            )
+          )}
+          {drillMode === "table" && tableDrillLevel === "typeInTable" && (
+            typeInTableChartData.length > 0 ? (
+              <DrillBarChart
+                data={typeInTableChartData}
+                dark={dark}
+                level="table"
+                onBarClick={(d, i) => setSelectedTypeSecond(typeInTableChartData[i].rawName ?? typeInTableChartData[i].name.replace(/ /g, "_"))}
+              />
+            ) : (
+              <div className={`flex items-center justify-center h-48 ${dark ? "text-gray-500" : "text-gray-400"}`}>
+                No tests for this filter combination
+              </div>
+            )
+          )}
+          {drillMode === "table" && tableDrillLevel === "detail" && (
+            <DetailList results={detailResultsTableFirst} dark={dark} />
           )}
         </div>
       </div>
 
       {/* ── Full results table ─────────────────────────────────────────── */}
       <ResultsTable results={latestResults} summary={summary} />
+    </div>
+  );
+}
+
+/* ── Shared drill-down chart component ───────────────────────────────────── */
+function DrillBarChart({
+  data, dark, level, onBarClick,
+}: {
+  data: { name: string; count: number; severity: string }[];
+  dark: boolean;
+  level: string;
+  onBarClick: (d: unknown, i: number) => void;
+}) {
+  return (
+    <ResponsiveContainer width="100%" height={320}>
+      <BarChart data={data} barCategoryGap="25%">
+        <XAxis
+          dataKey="name"
+          tick={{ fill: dark ? "#9ca3af" : "#6b7280", fontSize: 12 }}
+          axisLine={{ stroke: dark ? "#374151" : "#d1d5db" }}
+          tickLine={false}
+        />
+        <YAxis
+          tick={{ fill: dark ? "#9ca3af" : "#6b7280", fontSize: 12 }}
+          axisLine={false}
+          tickLine={false}
+          allowDecimals={false}
+        />
+        <Tooltip content={<ChartTooltip level={level} />} cursor={{ fill: dark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.04)" }} />
+        <Bar dataKey="count" radius={[8, 8, 0, 0]} cursor="pointer" animationDuration={600} onClick={onBarClick}>
+          {data.map((d, i) => (
+            <Cell key={i} fill={BAR_COLORS[d.severity] || "#6b7280"} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+function EmptyChart({ statusFilter, dark }: { statusFilter: string; dark: boolean }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-48 gap-2">
+      <span className="text-4xl">{statusFilter === "issues" ? "✓" : "—"}</span>
+      <p className={`text-lg font-medium ${statusFilter === "issues" ? "text-green-400" : "text-gray-500"}`}>
+        {statusFilter === "issues" ? "All tests passing" : "No tests match this filter"}
+      </p>
+      <p className={`text-sm ${dark ? "text-gray-600" : "text-gray-400"}`}>
+        {statusFilter === "issues" ? "No issues detected in the latest run" : "Try changing the filter above"}
+      </p>
+    </div>
+  );
+}
+
+function DetailList({ results, dark }: { results: TestResult[]; dark: boolean }) {
+  return (
+    <div className="space-y-3 max-h-[400px] overflow-auto pr-2">
+      {results.length > 0 ? (
+        results.map((r) => <DetailCard key={r.id} result={r} />)
+      ) : (
+        <div className={`flex items-center justify-center h-48 ${dark ? "text-gray-500" : "text-gray-400"}`}>
+          No tests match the current filter
+        </div>
+      )}
     </div>
   );
 }
@@ -506,20 +626,13 @@ function FilterPill({
   );
 }
 
-/* ── helpers to extract table / columns from metrics ──────────────────── */
+/* ── helpers to extract table / columns ───────────────────────────────── */
 function extractTable(r: TestResult): string {
-  return (r.metrics?.table as string) || "—";
+  return r.table || "—";
 }
 
 function extractColumns(r: TestResult): string {
-  const m = r.metrics || {};
-  // Check common metric keys that hold column info
-  if (m.column) return String(m.column);
-  if (Array.isArray(m.columns)) return (m.columns as string[]).join(", ");
-  if (m.expected_columns && typeof m.expected_columns === "object") {
-    return Object.keys(m.expected_columns as Record<string, unknown>).join(", ");
-  }
-  return "—";
+  return r.column || "—";
 }
 
 /* ── Results table with status filter ─────────────────────────────────── */
