@@ -55,6 +55,30 @@ def _name_to_id(name: str) -> str:
     return re.sub(r'[^a-z0-9]+', '_', name.lower()).strip('_')
 
 
+def _deduplicate_test_ids(tests: list[TestDefinition]) -> list[TestDefinition]:
+    """Append _2, _3, etc. to test IDs that collide after name normalization."""
+    seen: dict[str, int] = {}
+    result = []
+    for t in tests:
+        if t.test_id not in seen:
+            seen[t.test_id] = 1
+            result.append(t)
+        else:
+            seen[t.test_id] += 1
+            count = seen[t.test_id]
+            result.append(TestDefinition(
+                name=t.name,
+                test_id=f"{t.test_id}_{count}",
+                type=t.type,
+                profile=t.profile,
+                severity=t.severity,
+                enabled=t.enabled,
+                tags=t.tags,
+                raw=t.raw,
+            ))
+    return result
+
+
 def _load_yaml(path: Path) -> dict:
     with open(path, 'r', encoding='utf-8') as f:
         return yaml.safe_load(f) or {}
@@ -109,7 +133,7 @@ def load_config_from_api(api_url: str, api_key: str, connections: dict) -> DQFCo
             raw=raw,
         ))
 
-    return DQFConfig(engine=engine_cfg, connections=connections, tests=tests)
+    return DQFConfig(engine=engine_cfg, connections=connections, tests=_deduplicate_test_ids(tests))
 
 
 def load_config() -> DQFConfig:
@@ -160,5 +184,5 @@ def load_config() -> DQFConfig:
     return DQFConfig(
         engine=engine_cfg,
         connections=raw_connections,
-        tests=tests,
+        tests=_deduplicate_test_ids(tests),
     )
