@@ -24,3 +24,15 @@ export const apiGet = (path: string, token?: string) => request("GET", path, tok
 export const apiPost = (path: string, body: unknown, token?: string) => request("POST", path, token, body);
 export const apiPut = (path: string, body: unknown, token?: string) => request("PUT", path, token, body);
 export const apiDelete = (path: string, token?: string) => request("DELETE", path, token);
+
+/** Fetch a plain-text response (e.g. the YAML editor endpoint). */
+export async function apiGetText(path: string, token?: string): Promise<string> {
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(`${API_URL}${path}`, { headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || res.statusText);
+  }
+  return res.text();
+}

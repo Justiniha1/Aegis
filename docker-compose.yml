@@ -8,12 +8,15 @@ services:
       - "8000:8000"
     volumes:
       - ./db_data:/app/db_data
+      - ./backend/config:/app/config
     environment:
       DATABASE_URL: sqlite:////app/db_data/dashboard.db
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-local-dev-secret-do-not-use-in-prod}
+      DQF_YAML_PATH: /app/config/test_definitions.yaml
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
-      interval: 120s
+      interval: 30s
+      start_period: 10s
       timeout: 5s
       retries: 3
 

@@ -36,6 +36,9 @@ class TestResultOut(BaseModel):
     metrics: dict
     message: str
     run_at: datetime
+    # Enriched from TestDefinition.config at query time (not stored in TestResult)
+    table: Optional[str] = None
+    column: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
