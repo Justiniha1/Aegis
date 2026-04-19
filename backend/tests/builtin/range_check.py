@@ -2,11 +2,20 @@ from backend.core.database_connector import DatabaseConnector
 
 
 def run(connector: DatabaseConnector, test: dict) -> dict:
-    table = test["table"]
-    column = test["column"]
+    table = test.get("table", "").strip()
+    column = test.get("column", "").strip()
+
+    if not table:
+        return _error(test, "Missing required field: table")
+    if not column:
+        return _error(test, "Missing required field: column")
+
     min_value = test.get("min_value")
     max_value = test.get("max_value")
     max_outliers = test.get("max_outliers", 0)
+
+    if min_value is None and max_value is None:
+        return _error(test, "At least one of min_value or max_value must be specified")
 
     conditions = []
     if min_value is not None:
@@ -14,7 +23,7 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
     if max_value is not None:
         conditions.append(f"{column} > {max_value}")
 
-    where = " OR ".join(conditions) if conditions else "1=0"
+    where = " OR ".join(conditions)
 
     df = connector.execute_query(
         f"SELECT COUNT(*) AS outlier_count FROM {table} WHERE {where}"
@@ -45,4 +54,16 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
             f"{outlier_count} value(s) in {table}.{column} are outside {range_desc} "
             f"(max allowed: {max_outliers})"
         ),
+    }
+
+
+def _error(test: dict, msg: str) -> dict:
+    return {
+        "test_id": test["_test_id"],
+        "name": test["name"],
+        "type": "range_check",
+        "status": "ERROR",
+        "severity": test.get("severity", "MEDIUM"),
+        "metrics": {},
+        "message": msg,
     }
