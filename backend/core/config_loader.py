@@ -56,19 +56,29 @@ def _name_to_id(name: str) -> str:
 
 
 def _deduplicate_test_ids(tests: list[TestDefinition]) -> list[TestDefinition]:
-    """Append _2, _3, etc. to test IDs that collide after name normalization."""
-    seen: dict[str, int] = {}
+    """Append _2, _3, etc. to test IDs that collide after name normalization.
+
+    Handles the edge case where a suffixed candidate (e.g. my_test_2) is already
+    taken by an existing test — increments until a free slot is found.
+    """
+    seen: set[str] = set()
+    counters: dict[str, int] = {}
     result = []
     for t in tests:
         if t.test_id not in seen:
-            seen[t.test_id] = 1
+            seen.add(t.test_id)
             result.append(t)
         else:
-            seen[t.test_id] += 1
-            count = seen[t.test_id]
+            counters[t.test_id] = counters.get(t.test_id, 1)
+            candidate = f"{t.test_id}_{counters[t.test_id] + 1}"
+            while candidate in seen:
+                counters[t.test_id] += 1
+                candidate = f"{t.test_id}_{counters[t.test_id] + 1}"
+            counters[t.test_id] += 1
+            seen.add(candidate)
             result.append(TestDefinition(
                 name=t.name,
-                test_id=f"{t.test_id}_{count}",
+                test_id=candidate,
                 type=t.type,
                 profile=t.profile,
                 severity=t.severity,

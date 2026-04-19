@@ -23,9 +23,11 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
     if not table:
         return _error(test, "Missing required field: table")
 
-    expected_columns: dict = test.get("expected_columns") or {}
+    expected_columns = test.get("expected_columns") or {}
     if not expected_columns:
         return _error(test, "expected_columns must be provided and non-empty")
+    if not isinstance(expected_columns, dict):
+        return _error(test, "expected_columns must be a mapping of column_name: type")
 
     inspector = sa_inspect(connector.get_sqlalchemy_engine())
     try:

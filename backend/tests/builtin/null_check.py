@@ -18,7 +18,6 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
         f"FROM {table}"
     )
     total = int(df["total"].iloc[0])
-    null_count = int(df["null_count"].iloc[0])
 
     if total == 0:
         return {
@@ -31,6 +30,7 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
             "message": f"Table '{table}' is empty — null check skipped",
         }
 
+    null_count = int(df["null_count"].iloc[0])
     null_pct = null_count / total
     passed = null_pct <= threshold
     return {
