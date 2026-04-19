@@ -2,10 +2,15 @@ from backend.core.database_connector import DatabaseConnector
 
 
 def run(connector: DatabaseConnector, test: dict) -> dict:
-    table = test["table"]
-    # Support both 'column' (singular) and 'columns' (list)
+    table = test.get("table", "").strip()
+    if not table:
+        return _error(test, "Missing required field: table")
+
     raw_cols = test.get("columns") or [test.get("column")]
     columns = [c for c in raw_cols if c]
+    if not columns:
+        return _error(test, "At least one column must be specified for duplicate_check")
+
     max_allowed = test.get("max_allowed", 0)
 
     cols_sql = ", ".join(columns)
@@ -40,4 +45,16 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
             f"{dup_groups} duplicate group(s) found on [{cols_sql}] in {table} "
             f"(max allowed: {max_allowed})"
         ),
+    }
+
+
+def _error(test: dict, msg: str) -> dict:
+    return {
+        "test_id": test["_test_id"],
+        "name": test["name"],
+        "type": "duplicate_check",
+        "status": "ERROR",
+        "severity": test.get("severity", "MEDIUM"),
+        "metrics": {},
+        "message": msg,
     }
