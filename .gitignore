@@ -5,3 +5,8 @@ data/processed/
 .env
 dashboard.db
 db_data/
+
+# Claude Code & GSD
+.claude/
+.planning/
+docs/
