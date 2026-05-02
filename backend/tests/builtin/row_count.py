@@ -1,6 +1,6 @@
 from backend.core.database_connector import DatabaseConnector
 
-#look into oracle
+
 def _date_where(dialect: str, date_column: str, timeframe: str) -> str:
     if timeframe == "daily":
         if dialect == "sqlite":
@@ -33,11 +33,20 @@ def _date_where(dialect: str, date_column: str, timeframe: str) -> str:
 
 
 def run(connector: DatabaseConnector, test: dict) -> dict:
-    table = test["table"]
+    table = test.get("table", "").strip()
+    if not table:
+        return _error(test, "Missing required field: table")
+
     min_rows = test.get("min_rows")
     max_rows = test.get("max_rows")
     timeframe = test.get("timeframe", "all_time")
     date_column = test.get("date_column")
+
+    if min_rows is None and max_rows is None:
+        return _error(test, "At least one of min_rows or max_rows must be specified")
+
+    if timeframe != "all_time" and not date_column:
+        return _error(test, f"date_column is required when timeframe is '{timeframe}'")
 
     where_clause = ""
     if timeframe != "all_time" and date_column:
@@ -73,4 +82,16 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
             if passed else
             f"{table} row count check failed: " + "; ".join(failures)
         ),
+    }
+
+
+def _error(test: dict, msg: str) -> dict:
+    return {
+        "test_id": test["_test_id"],
+        "name": test["name"],
+        "type": "row_count",
+        "status": "ERROR",
+        "severity": test.get("severity", "MEDIUM"),
+        "metrics": {},
+        "message": msg,
     }

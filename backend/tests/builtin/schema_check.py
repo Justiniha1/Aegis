@@ -2,7 +2,6 @@ from sqlalchemy import inspect as sa_inspect
 
 from backend.core.database_connector import DatabaseConnector
 
-# Map of YAML type names → sets of SQLAlchemy type name substrings
 TYPE_MAP = {
     "integer": {"int", "bigint", "smallint"},
     "float": {"float", "double", "numeric", "decimal", "real"},
@@ -20,8 +19,15 @@ def _type_matches(sa_type_str: str, expected: str) -> bool:
 
 
 def run(connector: DatabaseConnector, test: dict) -> dict:
-    table = test["table"]
-    expected_columns: dict = test.get("expected_columns", {})
+    table = test.get("table", "").strip()
+    if not table:
+        return _error(test, "Missing required field: table")
+
+    expected_columns = test.get("expected_columns") or {}
+    if not expected_columns:
+        return _error(test, "expected_columns must be provided and non-empty")
+    if not isinstance(expected_columns, dict):
+        return _error(test, "expected_columns must be a mapping of column_name: type")
 
     inspector = sa_inspect(connector.get_sqlalchemy_engine())
     try:
@@ -30,15 +36,7 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
             for col in inspector.get_columns(table)
         }
     except Exception as e:
-        return {
-            "test_id": test["_test_id"],
-            "name": test["name"],
-            "type": "schema_check",
-            "status": "ERROR",
-            "severity": test.get("severity", "MEDIUM"),
-            "metrics": {},
-            "message": f"Could not inspect table '{table}': {e}",
-        }
+        return _error(test, f"Could not inspect table '{table}': {e}")
 
     missing = []
     type_mismatches = []
@@ -75,4 +73,16 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
             if passed else
             f"{table} schema issues: " + "; ".join(issues)
         ),
+    }
+
+
+def _error(test: dict, msg: str) -> dict:
+    return {
+        "test_id": test["_test_id"],
+        "name": test["name"],
+        "type": "schema_check",
+        "status": "ERROR",
+        "severity": test.get("severity", "MEDIUM"),
+        "metrics": {},
+        "message": msg,
     }

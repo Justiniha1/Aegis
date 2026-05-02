@@ -2,8 +2,14 @@ from backend.core.database_connector import DatabaseConnector
 
 
 def run(connector: DatabaseConnector, test: dict) -> dict:
-    table = test["table"]
-    column = test["column"]
+    table = test.get("table", "").strip()
+    column = test.get("column", "").strip()
+
+    if not table:
+        return _error(test, "Missing required field: table")
+    if not column:
+        return _error(test, "Missing required field: column")
+
     threshold = test.get("threshold", 0.0)
 
     df = connector.execute_query(
@@ -12,9 +18,20 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
         f"FROM {table}"
     )
     total = int(df["total"].iloc[0])
-    null_count = int(df["null_count"].iloc[0])
-    null_pct = null_count / total if total > 0 else 0.0
 
+    if total == 0:
+        return {
+            "test_id": test["_test_id"],
+            "name": test["name"],
+            "type": "null_check",
+            "status": "SKIPPED",
+            "severity": test.get("severity", "MEDIUM"),
+            "metrics": {"total_rows": 0},
+            "message": f"Table '{table}' is empty — null check skipped",
+        }
+
+    null_count = int(df["null_count"].iloc[0])
+    null_pct = null_count / total
     passed = null_pct <= threshold
     return {
         "test_id": test["_test_id"],
@@ -34,4 +51,16 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
             f"Null percentage ({null_pct:.2%}) exceeds threshold ({threshold:.2%}) "
             f"— {null_count} null(s) in {table}.{column}"
         ),
+    }
+
+
+def _error(test: dict, msg: str) -> dict:
+    return {
+        "test_id": test["_test_id"],
+        "name": test["name"],
+        "type": "null_check",
+        "status": "ERROR",
+        "severity": test.get("severity", "MEDIUM"),
+        "metrics": {},
+        "message": msg,
     }

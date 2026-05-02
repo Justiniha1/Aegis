@@ -1,4 +1,5 @@
 from pathlib import Path
+from urllib.parse import quote_plus
 
 import pandas as pd
 from sqlalchemy import create_engine, text
@@ -30,8 +31,8 @@ def build_connection_url(profile: dict) -> str:
             p = (config_dir / p).resolve()
         return f"sqlite:///{p}"
 
-    user = profile.get("username", "")
-    password = profile.get("password", "")
+    user = quote_plus(str(profile.get("username", "")))
+    password = quote_plus(str(profile.get("password", "")))
     host = profile.get("host", "localhost")
     database = profile.get("database", "")
 

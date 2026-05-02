@@ -2,10 +2,23 @@ from backend.core.database_connector import DatabaseConnector
 
 
 def run(connector: DatabaseConnector, test: dict) -> dict:
-    source_table = test["source_table"]
-    source_column = test["source_column"]
-    target_table = test["target_table"]
-    target_column = test["target_column"]
+    source_table = test.get("source_table", "").strip()
+    source_column = test.get("source_column", "").strip()
+    target_table = test.get("target_table", "").strip()
+    target_column = test.get("target_column", "").strip()
+
+    missing = [
+        field for field, value in [
+            ("source_table", source_table),
+            ("source_column", source_column),
+            ("target_table", target_table),
+            ("target_column", target_column),
+        ]
+        if not value
+    ]
+    if missing:
+        return _error(test, f"Missing required field(s): {', '.join(missing)}")
+
     max_orphans = test.get("max_orphans", 0)
 
     df = connector.execute_query(
@@ -42,4 +55,16 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
             f"have no match in {target_table}.{target_column} "
             f"(max allowed: {max_orphans})"
         ),
+    }
+
+
+def _error(test: dict, msg: str) -> dict:
+    return {
+        "test_id": test["_test_id"],
+        "name": test["name"],
+        "type": "relationship_check",
+        "status": "ERROR",
+        "severity": test.get("severity", "MEDIUM"),
+        "metrics": {},
+        "message": msg,
     }
