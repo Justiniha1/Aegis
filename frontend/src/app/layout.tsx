@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DQF Dashboard",
-  description: "Data Quality Framework — Monitor your data quality in real time",
+  title: "Aegis",
+  description: "Aegis — Monitor your data quality in real time",
 };
 
 export default function RootLayout({

@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { apiGet, apiGetText, apiDelete, apiPost, apiPut } from "@/lib/api";
 import { SeverityBadge } from "@/components/StatusBadge";
+import { TYPE_LABELS, formatConfigKey } from "@/lib/constants";
 import type { TestDefinition } from "@/lib/types";
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
@@ -171,8 +172,10 @@ function TestTable({
           {tests.map((t) => {
             const isExpanded = expandedId === t.id;
             const configEntries = Object.entries(t.config || {}).filter(
-              ([k]) => !["table", "column", "columns"].includes(k)
+              ([k]) => !["table", "column", "columns", "query"].includes(k)
             );
+            const isCustomSql = t.type === "custom_sql";
+            const sqlQuery = isCustomSql ? (t.config?.query as string | undefined) : undefined;
             return (
               <Fragment key={t.id}>
                 <tr
@@ -181,17 +184,22 @@ function TestTable({
                   } ${!t.enabled ? "opacity-50" : ""}`}
                   onClick={() => setExpandedId(isExpanded ? null : t.id)}
                 >
-                  <td className="pl-6 py-3 text-gray-500 text-xs">
-                    {configEntries.length > 0 ? (isExpanded ? "▼" : "▶") : ""}
+                  <td className={`pl-6 py-3 text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>
+                    {(configEntries.length > 0 || (isCustomSql && sqlQuery)) ? (isExpanded ? "▼" : "▶") : ""}
                   </td>
-                  <td className="px-6 py-3">
-                    <div className={dark ? "text-white" : "text-gray-900"}>{t.name}</div>
+                  <td className="px-6 py-3 max-w-xs">
+                    <div className={`line-clamp-2 ${dark ? "text-white" : "text-gray-900"}`} title={t.name}>{t.name}</div>
                     {t.description && (
-                      <div className={`text-xs mt-0.5 ${dark ? "text-gray-500" : "text-gray-400"}`}>{t.description}</div>
+                      <div
+                        className={`text-xs mt-0.5 line-clamp-1 ${dark ? "text-gray-500" : "text-gray-400"}`}
+                        title={t.description}
+                      >
+                        {t.description}
+                      </div>
                     )}
                   </td>
                   <td className={`px-6 py-3 ${dark ? "text-gray-400" : "text-gray-500"}`}>
-                    {t.type.replace(/_/g, " ")}
+                    {TYPE_LABELS[t.type] ?? t.type}
                   </td>
                   <td className={`px-6 py-3 font-mono text-xs ${dark ? "text-gray-300" : "text-gray-600"}`}>
                     {extractTable(t)}
@@ -221,9 +229,25 @@ function TestTable({
                     </button>
                   </td>
                 </tr>
-                {isExpanded && configEntries.length > 0 && (
+                {isExpanded && (configEntries.length > 0 || (isCustomSql && sqlQuery)) && (
                   <tr>
                     <td colSpan={8} className={`px-12 py-3 ${dark ? "bg-gray-800/20" : "bg-gray-50"}`}>
+                      {isCustomSql && (
+                        <div className={`mt-3 rounded-lg overflow-hidden border ${
+                          dark ? "bg-gray-950 border-gray-800" : "bg-gray-50 border-gray-200"
+                        }`}>
+                          <div className={`px-4 py-2 border-b text-xs font-mono ${
+                            dark ? "border-gray-800 text-gray-500" : "border-gray-200 text-gray-500"
+                          }`}>
+                            query
+                          </div>
+                          <pre className={`px-4 py-3 font-mono text-xs overflow-x-auto whitespace-pre max-h-80 overflow-y-auto ${
+                            dark ? "text-gray-300" : "text-gray-700"
+                          }`}>
+                            <code>{sqlQuery || "(no query defined)"}</code>
+                          </pre>
+                        </div>
+                      )}
                       <div className="grid grid-cols-4 gap-3">
                         <div className={`rounded-lg px-3 py-2 ${dark ? "bg-gray-900/50" : "bg-white border border-gray-200"}`}>
                           <p className={`text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>profile</p>
@@ -243,8 +267,11 @@ function TestTable({
                         )}
                         {configEntries.map(([key, val]) => (
                           <div key={key} className={`rounded-lg px-3 py-2 ${dark ? "bg-gray-900/50" : "bg-white border border-gray-200"}`}>
-                            <p className={`text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>{key.replace(/_/g, " ")}</p>
-                            <p className={`text-sm font-medium mt-0.5 break-all ${dark ? "text-white" : "text-gray-900"}`}>
+                            <p className={`text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>{formatConfigKey(key)}</p>
+                            <p
+                              className={`text-sm font-medium mt-0.5 truncate ${dark ? "text-white" : "text-gray-900"}`}
+                              title={typeof val === "object" ? JSON.stringify(val) : String(val)}
+                            >
                               {typeof val === "object" ? JSON.stringify(val) : String(val)}
                             </p>
                           </div>
@@ -321,7 +348,11 @@ function YamlEditor({ token, dark, onSaved }: { token: string; dark: boolean; on
           <p className={`text-sm font-medium ${dark ? "text-gray-300" : "text-gray-700"}`}>test_definitions.yaml</p>
           <div className="flex items-center gap-3">
             {feedback && (
-              <span className={`text-xs ${feedback.type === "success" ? "text-green-400" : "text-red-400"}`}>
+              <span className={`text-xs ${
+                feedback.type === "success"
+                  ? dark ? "text-green-400" : "text-green-600"
+                  : dark ? "text-red-400" : "text-red-600"
+              }`}>
                 {feedback.message}
               </span>
             )}
@@ -338,7 +369,7 @@ function YamlEditor({ token, dark, onSaved }: { token: string; dark: boolean; on
           value={yamlContent}
           onChange={(e) => { setYamlContent(e.target.value); setFeedback(null); }}
           spellCheck={false}
-          className={`w-full h-[600px] px-6 py-4 font-mono text-sm resize-none focus:outline-none ${
+          className={`w-full h-[600px] px-6 py-4 font-mono text-sm resize-none focus:outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500 ${
             dark
               ? "bg-gray-950 text-gray-300 placeholder-gray-600"
               : "bg-gray-50 text-gray-800 placeholder-gray-400"
@@ -483,7 +514,7 @@ function CreateTestForm({ token, dark, onCreated }: { token: string; dark: boole
               <div>
                 <label className={labelCls}>Type</label>
                 <select value={type} onChange={(e) => setType(e.target.value)} className={inputCls}>
-                  {TEST_TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
+                  {TEST_TYPES.map((t) => <option key={t} value={t}>{TYPE_LABELS[t] ?? t}</option>)}
                 </select>
               </div>
               <div>

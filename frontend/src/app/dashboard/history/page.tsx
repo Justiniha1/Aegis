@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { apiGet } from "@/lib/api";
 import { StatusBadge, SeverityBadge } from "@/components/StatusBadge";
+import { TYPE_LABELS } from "@/lib/constants";
 import type { TestResult, RunSummary } from "@/lib/types";
 
 export default function HistoryPage() {
@@ -57,7 +58,7 @@ export default function HistoryPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
       <h1 className={`text-xl font-bold ${dark ? "text-white" : "text-gray-900"}`}>Run History</h1>
 
       <div className="grid grid-cols-3 gap-6">
@@ -133,7 +134,7 @@ export default function HistoryPage() {
                   {selectedResults.map((r) => (
                     <tr key={r.id} className={dark ? "hover:bg-gray-800/30" : "hover:bg-gray-50"}>
                       <td className={`px-6 py-3 ${dark ? "text-white" : "text-gray-900"}`}>{r.test_name}</td>
-                      <td className={`px-6 py-3 ${dark ? "text-gray-400" : "text-gray-500"}`}>{r.test_type.replace(/_/g, " ")}</td>
+                      <td className={`px-6 py-3 ${dark ? "text-gray-400" : "text-gray-500"}`}>{TYPE_LABELS[r.test_type] ?? r.test_type}</td>
                       <td className="px-6 py-3"><StatusBadge status={r.status} /></td>
                       <td className="px-6 py-3"><SeverityBadge severity={r.severity} /></td>
                       <td className={`px-6 py-3 max-w-sm truncate ${dark ? "text-gray-400" : "text-gray-500"}`}>{r.message}</td>

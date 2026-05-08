@@ -16,7 +16,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { apiGet } from "@/lib/api";
-import { SEVERITY_COLORS } from "@/lib/constants";
+import { SEVERITY_COLORS, TYPE_LABELS, SEVERITY_LABELS, formatConfigKey } from "@/lib/constants";
 import { StatusBadge, SeverityBadge } from "@/components/StatusBadge";
 import type { TestResult } from "@/lib/types";
 
@@ -50,13 +50,15 @@ function AnimatedNumber({ value }: { value: number }) {
 }
 
 /* ── custom tooltip ───────────────────────────────────────────────────────── */
-function ChartTooltip({ active, payload, label, level }: any) {
+function ChartTooltip({ active, payload, label, level, dark }: any) {
   if (!active || !payload?.length) return null;
   const count = payload[0].value;
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 shadow-xl text-white">
+    <div className={`rounded-lg px-4 py-3 shadow-xl border ${
+      dark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"
+    }`}>
       <p className="font-medium text-sm">{label}</p>
-      <p className="text-gray-300 text-xs mt-1">
+      <p className={`text-xs mt-1 ${dark ? "text-gray-300" : "text-gray-600"}`}>
         {count} test{count !== 1 ? "s" : ""}
       </p>
       {level !== "detail" && (
@@ -151,7 +153,7 @@ export default function DashboardPage() {
     }
     return Object.entries(groups)
       .map(([name, items]) => ({
-        name: name.replace(/_/g, " "),
+        name: TYPE_LABELS[name] ?? name,
         rawName: name,
         count: items.length,
         severity: worstSeverity(items),
@@ -204,7 +206,7 @@ export default function DashboardPage() {
       (groups[r.test_type] ??= []).push(r);
     }
     return Object.entries(groups)
-      .map(([name, items]) => ({ name: name.replace(/_/g, " "), rawName: name, count: items.length, severity: worstSeverity(items) }))
+      .map(([name, items]) => ({ name: TYPE_LABELS[name] ?? name, rawName: name, count: items.length, severity: worstSeverity(items) }))
       .sort((a, b) => b.count - a.count);
   }, [chartResults, selectedTableFirst]);
 
@@ -373,7 +375,7 @@ export default function DashboardPage() {
                     : dark ? "text-gray-500 hover:text-gray-300 transition-colors" : "text-gray-400 hover:text-gray-700 transition-colors"
                   }
                 >
-                  {selectedType.replace(/_/g, " ")}
+                  {TYPE_LABELS[selectedType] ?? selectedType}
                 </button>
               </>
             )}
@@ -402,7 +404,7 @@ export default function DashboardPage() {
             {drillMode === "table" && selectedTypeSecond && (
               <>
                 <span className={dark ? "text-gray-700" : "text-gray-300"}>/</span>
-                <span className={dark ? "text-white font-semibold" : "text-gray-900 font-semibold"}>{selectedTypeSecond.replace(/_/g, " ")}</span>
+                <span className={dark ? "text-white font-semibold" : "text-gray-900 font-semibold"}>{TYPE_LABELS[selectedTypeSecond] ?? selectedTypeSecond}</span>
               </>
             )}
           </div>
@@ -421,7 +423,7 @@ export default function DashboardPage() {
               severityCounts[s] ? (
                 <FilterPill
                   key={s}
-                  label={s}
+                  label={SEVERITY_LABELS[s] ?? s}
                   count={severityCounts[s]}
                   active={severityFilter === s}
                   color={SEVERITY_COLORS[s]}
@@ -485,7 +487,7 @@ export default function DashboardPage() {
                 data={typeInTableChartData}
                 dark={dark}
                 level="table"
-                onBarClick={(d, i) => setSelectedTypeSecond(typeInTableChartData[i].rawName ?? typeInTableChartData[i].name.replace(/ /g, "_"))}
+                onBarClick={(d, i) => setSelectedTypeSecond(typeInTableChartData[i].rawName)}
               />
             ) : (
               <div className={`flex items-center justify-center h-48 ${dark ? "text-gray-500" : "text-gray-400"}`}>
@@ -529,7 +531,7 @@ function DrillBarChart({
           tickLine={false}
           allowDecimals={false}
         />
-        <Tooltip content={<ChartTooltip level={level} />} cursor={{ fill: dark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.04)" }} />
+        <Tooltip content={<ChartTooltip level={level} dark={dark} />} cursor={{ fill: dark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.04)" }} />
         <Bar dataKey="count" radius={[8, 8, 0, 0]} cursor="pointer" animationDuration={600} onClick={onBarClick}>
           {data.map((d, i) => (
             <Cell key={i} fill={BAR_COLORS[d.severity] || "#6b7280"} />
@@ -713,13 +715,13 @@ function ResultsTable({ results, summary }: { results: TestResult[]; summary: { 
                     <td className="pl-6 py-3 text-gray-600 text-xs">
                       {metricEntries.length > 0 ? (isExpanded ? "▼" : "▶") : ""}
                     </td>
-                    <td className={`px-6 py-3 ${dark ? "text-white" : "text-gray-900"}`}>{r.test_name}</td>
-                    <td className={`px-6 py-3 ${dark ? "text-gray-400" : "text-gray-500"}`}>{r.test_type.replace(/_/g, " ")}</td>
-                    <td className={`px-6 py-3 font-mono text-xs ${dark ? "text-gray-300" : "text-gray-600"}`}>{extractTable(r)}</td>
-                    <td className={`px-6 py-3 font-mono text-xs ${dark ? "text-gray-300" : "text-gray-600"}`}>{extractColumns(r)}</td>
+                    <td className={`px-6 py-3 max-w-xs truncate ${dark ? "text-white" : "text-gray-900"}`} title={r.test_name}>{r.test_name}</td>
+                    <td className={`px-6 py-3 ${dark ? "text-gray-400" : "text-gray-500"}`}>{TYPE_LABELS[r.test_type] ?? r.test_type}</td>
+                    <td className={`px-6 py-3 max-w-[12rem] truncate font-mono text-xs ${dark ? "text-gray-300" : "text-gray-600"}`} title={extractTable(r)}>{extractTable(r)}</td>
+                    <td className={`px-6 py-3 max-w-[10rem] truncate font-mono text-xs ${dark ? "text-gray-300" : "text-gray-600"}`} title={extractColumns(r)}>{extractColumns(r)}</td>
                     <td className="px-6 py-3"><StatusBadge status={r.status} /></td>
                     <td className="px-6 py-3"><SeverityBadge severity={r.severity} /></td>
-                    <td className={`px-6 py-3 max-w-xs truncate ${dark ? "text-gray-400" : "text-gray-500"}`}>{r.message}</td>
+                    <td className={`px-6 py-3 max-w-xs truncate ${dark ? "text-gray-400" : "text-gray-500"}`} title={r.message}>{r.message}</td>
                   </tr>
                   {isExpanded && metricEntries.length > 0 && (
                     <tr>
@@ -727,7 +729,7 @@ function ResultsTable({ results, summary }: { results: TestResult[]; summary: { 
                         <div className="grid grid-cols-4 gap-3">
                           {metricEntries.map(([key, val]) => (
                             <div key={key} className={`rounded-lg px-3 py-2 ${dark ? "bg-gray-900/50" : "bg-white border border-gray-200"}`}>
-                              <p className={`text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>{key.replace(/_/g, " ")}</p>
+                              <p className={`text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>{formatConfigKey(key)}</p>
                               <p className={`text-sm font-medium mt-0.5 ${dark ? "text-white" : "text-gray-900"}`}>
                                 {typeof val === "number"
                                   ? val < 1 && val > 0
@@ -804,7 +806,7 @@ function DetailCard({ result: r }: { result: TestResult }) {
         <div className="mt-3 ml-6 grid grid-cols-3 gap-3">
           {metricEntries.map(([key, val]) => (
             <div key={key} className={`rounded-lg px-3 py-2 ${dark ? "bg-gray-900/50" : "bg-white border border-gray-200"}`}>
-              <p className={`text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>{key.replace(/_/g, " ")}</p>
+              <p className={`text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>{formatConfigKey(key)}</p>
               <p className={`text-sm font-medium mt-0.5 ${dark ? "text-white" : "text-gray-900"}`}>
                 {typeof val === "number"
                   ? val < 1 && val > 0

@@ -30,15 +30,14 @@ export default function DashboardLayout({
   };
 
   return (
-    <div className={`min-h-screen flex ${dark ? "bg-gray-950" : "bg-gray-50"}`}>
+    <div className={`h-screen flex ${dark ? "bg-gray-950" : "bg-gray-50"}`}>
       {/* Sidebar */}
       <aside className={`w-56 border-r flex flex-col ${dark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"}`}>
-        <div className={`px-5 py-5 border-b ${dark ? "border-gray-800" : "border-gray-200"}`}>
-          <h1 className={`text-lg font-bold ${dark ? "text-white" : "text-gray-900"}`}>DQF</h1>
-          <p className={`text-xs mt-0.5 ${dark ? "text-gray-500" : "text-gray-400"}`}>Data Quality Framework</p>
+        <div className={`px-5 py-6 border-b ${dark ? "border-gray-800" : "border-gray-200"}`}>
+          <h1 className={`text-lg font-bold ${dark ? "text-white" : "text-gray-900"}`}>Aegis</h1>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {NAV_ITEMS.map((item) => {
             const active = pathname === item.href;
             return (

@@ -29,7 +29,7 @@ export default function LoginPage() {
     }
   };
 
-  const inputCls = `w-full px-3 py-2 rounded-lg border focus:outline-none focus:border-blue-500 ${
+  const inputCls = `w-full px-3 py-2 rounded-lg border focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 ${
     dark
       ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
       : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
@@ -39,9 +39,9 @@ export default function LoginPage() {
     <div className={`min-h-screen flex items-center justify-center ${dark ? "bg-gray-950" : "bg-gray-50"}`}>
       <div className="w-full max-w-sm">
         <div className={`rounded-xl border p-8 shadow-xl ${dark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"}`}>
-          <h1 className={`text-2xl font-bold mb-1 ${dark ? "text-white" : "text-gray-900"}`}>DQF Dashboard</h1>
+          <h1 className={`text-2xl font-bold mb-1 ${dark ? "text-white" : "text-gray-900"}`}>Aegis</h1>
           <p className={`mb-8 text-sm ${dark ? "text-gray-400" : "text-gray-500"}`}>
-            Sign in to monitor your data quality
+            Sign in to your data quality dashboard
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -69,7 +69,9 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <p className="text-red-500 text-sm bg-red-500/10 px-3 py-2 rounded-lg">{error}</p>
+              <p className={`text-sm px-3 py-2 rounded-lg ${
+                dark ? "text-red-500 bg-red-500/10" : "text-red-700 bg-red-50"
+              }`}>{error}</p>
             )}
 
             <button
