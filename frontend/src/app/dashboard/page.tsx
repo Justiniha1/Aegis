@@ -18,7 +18,7 @@ import { useTheme } from "@/lib/theme";
 import { apiGet } from "@/lib/api";
 import { SEVERITY_COLORS, TYPE_LABELS, SEVERITY_LABELS, formatConfigKey } from "@/lib/constants";
 import { StatusBadge, SeverityBadge } from "@/components/StatusBadge";
-import type { TestResult } from "@/lib/types";
+import type { TestResult, TestDefinition } from "@/lib/types";
 
 /* ── colour helpers ───────────────────────────────────────────────────────── */
 const SEV_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW"] as const;
@@ -85,6 +85,7 @@ export default function DashboardPage() {
   const dark = theme === "dark";
   const router = useRouter();
   const [results, setResults] = useState<TestResult[]>([]);
+  const [testDefs, setTestDefs] = useState<TestDefinition[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Drill state
@@ -102,11 +103,54 @@ export default function DashboardPage() {
   useEffect(() => {
     if (authLoading) return;
     if (!token) { router.push("/login"); return; }
-    apiGet("/api/v1/results?limit=500", token)
-      .then(setResults)
+    Promise.all([
+      apiGet("/api/v1/results?limit=500", token),
+      apiGet("/api/v1/tests", token),
+    ])
+      .then(([res, defs]) => { setResults(res); setTestDefs(defs); })
       .catch(() => router.push("/login"))
       .finally(() => setLoading(false));
   }, [token, authLoading, router]);
+
+  // Map test_name → derived primary table for tests where the engine doesn't
+  // populate `r.table` (custom_sql joins multiple tables; relationship_check
+  // crosses two). Without this, the drill chart shows test names instead of
+  // tables for those test types.
+  //   - custom_sql:         parse the first `FROM <ident>` in the query
+  //   - relationship_check: read `config.source_table`
+  const derivedTableMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const def of testDefs) {
+      const cfg = (def.config || {}) as Record<string, unknown>;
+      if (def.type === "custom_sql") {
+        const q = (cfg.query as string | undefined) || "";
+        const match = q.match(/\bfrom\s+([a-zA-Z_][a-zA-Z0-9_]*)/i);
+        if (match) m.set(def.name, match[1]);
+      } else if (def.type === "relationship_check") {
+        const src = cfg.source_table as string | undefined;
+        if (src) m.set(def.name, src);
+      }
+    }
+    return m;
+  }, [testDefs]);
+
+  // Map test_name → SQL query string, for displaying the actual SQL run on
+  // custom_sql tests in the latest-results table expand row and the drill-down
+  // detail card.
+  const queryByTestName = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const def of testDefs) {
+      if (def.type !== "custom_sql") continue;
+      const q = (def.config?.query as string | undefined);
+      if (q) m.set(def.name, q);
+    }
+    return m;
+  }, [testDefs]);
+
+  // Resolve the table label for a result row (for drill-chart bucketing).
+  // Priority: explicit r.table from engine → derived primary table → test_name fallback.
+  const tableFor = (r: TestResult): string =>
+    r.table || derivedTableMap.get(r.test_name) || r.test_name;
 
   /* ── derived data (memoised) ──────────────────────────────────────────── */
   const latestResults = useMemo(() => {
@@ -167,57 +211,57 @@ export default function DashboardPage() {
     const groups: Record<string, TestResult[]> = {};
     for (const r of chartResults) {
       if (r.test_type !== selectedType) continue;
-      const table = r.table || r.test_name;
+      const table = tableFor(r);
       (groups[table] ??= []).push(r);
     }
     return Object.entries(groups)
       .map(([name, items]) => ({ name, count: items.length, severity: worstSeverity(items) }))
       .sort((a, b) => b.count - a.count);
-  }, [chartResults, selectedType]);
+  }, [chartResults, selectedType, derivedTableMap]);
 
   // Level 3: detail rows
   const detailResults = useMemo(() => {
     if (!selectedTable || !selectedType) return [];
     return chartResults.filter((r) => {
-      const table = r.table || r.test_name;
+      const table = tableFor(r);
       return r.test_type === selectedType && table === selectedTable;
     });
-  }, [chartResults, selectedType, selectedTable]);
+  }, [chartResults, selectedType, selectedTable, derivedTableMap]);
 
   // "By Table" Level 1: all tables grouped
   const tableFirstChartData = useMemo(() => {
     const groups: Record<string, TestResult[]> = {};
     for (const r of chartResults) {
-      const table = r.table || r.test_name;
+      const table = tableFor(r);
       (groups[table] ??= []).push(r);
     }
     return Object.entries(groups)
       .map(([name, items]) => ({ name, count: items.length, severity: worstSeverity(items) }))
       .sort((a, b) => b.count - a.count);
-  }, [chartResults]);
+  }, [chartResults, derivedTableMap]);
 
   // "By Table" Level 2: error types within selected table
   const typeInTableChartData = useMemo(() => {
     if (!selectedTableFirst) return [];
     const groups: Record<string, TestResult[]> = {};
     for (const r of chartResults) {
-      const table = r.table || r.test_name;
+      const table = tableFor(r);
       if (table !== selectedTableFirst) continue;
       (groups[r.test_type] ??= []).push(r);
     }
     return Object.entries(groups)
       .map(([name, items]) => ({ name: TYPE_LABELS[name] ?? name, rawName: name, count: items.length, severity: worstSeverity(items) }))
       .sort((a, b) => b.count - a.count);
-  }, [chartResults, selectedTableFirst]);
+  }, [chartResults, selectedTableFirst, derivedTableMap]);
 
   // "By Table" Level 3: detail rows
   const detailResultsTableFirst = useMemo(() => {
     if (!selectedTableFirst || !selectedTypeSecond) return [];
     return chartResults.filter((r) => {
-      const table = r.table || r.test_name;
+      const table = tableFor(r);
       return table === selectedTableFirst && r.test_type === selectedTypeSecond;
     });
-  }, [chartResults, selectedTableFirst, selectedTypeSecond]);
+  }, [chartResults, selectedTableFirst, selectedTypeSecond, derivedTableMap]);
 
   /* ── severity filter counts (for the filter pills) ─────────────────── */
   const severityCounts = useMemo(() => {
@@ -465,7 +509,7 @@ export default function DashboardPage() {
             )
           )}
           {drillMode === "type" && drillLevel === "detail" && (
-            <DetailList results={detailResults} dark={dark} />
+            <DetailList results={detailResults} dark={dark} queryByTestName={queryByTestName} />
           )}
 
           {/* ── By Table mode ── */}
@@ -496,13 +540,13 @@ export default function DashboardPage() {
             )
           )}
           {drillMode === "table" && tableDrillLevel === "detail" && (
-            <DetailList results={detailResultsTableFirst} dark={dark} />
+            <DetailList results={detailResultsTableFirst} dark={dark} queryByTestName={queryByTestName} />
           )}
         </div>
       </div>
 
       {/* ── Full results table ─────────────────────────────────────────── */}
-      <ResultsTable results={latestResults} summary={summary} />
+      <ResultsTable results={latestResults} summary={summary} queryByTestName={queryByTestName} />
     </div>
   );
 }
@@ -556,11 +600,21 @@ function EmptyChart({ statusFilter, dark }: { statusFilter: string; dark: boolea
   );
 }
 
-function DetailList({ results, dark }: { results: TestResult[]; dark: boolean }) {
+function DetailList({
+  results,
+  dark,
+  queryByTestName,
+}: {
+  results: TestResult[];
+  dark: boolean;
+  queryByTestName: Map<string, string>;
+}) {
   return (
     <div className="space-y-3 max-h-[400px] overflow-auto pr-2">
       {results.length > 0 ? (
-        results.map((r) => <DetailCard key={r.id} result={r} />)
+        results.map((r) => (
+          <DetailCard key={r.id} result={r} sqlQuery={queryByTestName.get(r.test_name)} />
+        ))
       ) : (
         <div className={`flex items-center justify-center h-48 ${dark ? "text-gray-500" : "text-gray-400"}`}>
           No tests match the current filter
@@ -640,7 +694,15 @@ function extractColumns(r: TestResult): string {
 /* ── Results table with status filter ─────────────────────────────────── */
 type TableFilter = "all" | "issues" | "passing";
 
-function ResultsTable({ results, summary }: { results: TestResult[]; summary: { total: number } }) {
+function ResultsTable({
+  results,
+  summary,
+  queryByTestName,
+}: {
+  results: TestResult[];
+  summary: { total: number };
+  queryByTestName: Map<string, string>;
+}) {
   const { theme } = useTheme();
   const dark = theme === "dark";
   const [filter, setFilter] = useState<TableFilter>("all");
@@ -706,6 +768,9 @@ function ResultsTable({ results, summary }: { results: TestResult[]; summary: { 
               const metricEntries = Object.entries(r.metrics || {}).filter(
                 ([k]) => !["table", "column", "columns", "expected_columns", "query"].includes(k)
               );
+              const isCustomSql = r.test_type === "custom_sql";
+              const sqlQuery = isCustomSql ? queryByTestName.get(r.test_name) : undefined;
+              const hasExpandContent = metricEntries.length > 0 || (isCustomSql && sqlQuery);
               return (
                 <Fragment key={r.id}>
                   <tr
@@ -713,7 +778,7 @@ function ResultsTable({ results, summary }: { results: TestResult[]; summary: { 
                     onClick={() => setExpandedRow(isExpanded ? null : r.id)}
                   >
                     <td className="pl-6 py-3 text-gray-600 text-xs">
-                      {metricEntries.length > 0 ? (isExpanded ? "▼" : "▶") : ""}
+                      {hasExpandContent ? (isExpanded ? "▼" : "▶") : ""}
                     </td>
                     <td className={`px-6 py-3 max-w-xs truncate ${dark ? "text-white" : "text-gray-900"}`} title={r.test_name}>{r.test_name}</td>
                     <td className={`px-6 py-3 ${dark ? "text-gray-400" : "text-gray-500"}`}>{TYPE_LABELS[r.test_type] ?? r.test_type}</td>
@@ -723,23 +788,44 @@ function ResultsTable({ results, summary }: { results: TestResult[]; summary: { 
                     <td className="px-6 py-3"><SeverityBadge severity={r.severity} /></td>
                     <td className={`px-6 py-3 max-w-xs truncate ${dark ? "text-gray-400" : "text-gray-500"}`} title={r.message}>{r.message}</td>
                   </tr>
-                  {isExpanded && metricEntries.length > 0 && (
+                  {isExpanded && hasExpandContent && (
                     <tr>
                       <td colSpan={8} className={`px-12 py-3 ${dark ? "bg-gray-800/20" : "bg-gray-50"}`}>
-                        <div className="grid grid-cols-4 gap-3">
-                          {metricEntries.map(([key, val]) => (
-                            <div key={key} className={`rounded-lg px-3 py-2 ${dark ? "bg-gray-900/50" : "bg-white border border-gray-200"}`}>
-                              <p className={`text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>{formatConfigKey(key)}</p>
-                              <p className={`text-sm font-medium mt-0.5 ${dark ? "text-white" : "text-gray-900"}`}>
-                                {typeof val === "number"
-                                  ? val < 1 && val > 0
-                                    ? `${(val * 100).toFixed(1)}%`
-                                    : val.toLocaleString()
-                                  : String(val)}
-                              </p>
+                        {isCustomSql && sqlQuery && (
+                          <div className={`mb-3 rounded-lg overflow-hidden border ${
+                            dark ? "bg-gray-950 border-gray-800" : "bg-white border-gray-200"
+                          }`}>
+                            <div className={`px-4 py-2 border-b text-xs font-mono ${
+                              dark ? "border-gray-800 text-gray-500" : "border-gray-200 text-gray-500"
+                            }`}>
+                              query
                             </div>
-                          ))}
-                        </div>
+                            <pre className={`px-4 py-3 font-mono text-xs overflow-x-auto whitespace-pre max-h-64 overflow-y-auto ${
+                              dark ? "text-gray-300" : "text-gray-700"
+                            }`}>
+                              <code>{sqlQuery}</code>
+                            </pre>
+                          </div>
+                        )}
+                        {metricEntries.length > 0 && (
+                          <div className="grid grid-cols-4 gap-3">
+                            {metricEntries.map(([key, val]) => (
+                              <div key={key} className={`rounded-lg px-3 py-2 ${dark ? "bg-gray-900/50" : "bg-white border border-gray-200"}`}>
+                                <p className={`text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>{formatConfigKey(key)}</p>
+                                <p
+                                  className={`text-sm font-medium mt-0.5 truncate ${dark ? "text-white" : "text-gray-900"}`}
+                                  title={typeof val === "object" ? JSON.stringify(val) : String(val)}
+                                >
+                                  {typeof val === "number"
+                                    ? val < 1 && val > 0
+                                      ? `${(val * 100).toFixed(1)}%`
+                                      : val.toLocaleString()
+                                    : String(val)}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   )}
@@ -753,7 +839,7 @@ function ResultsTable({ results, summary }: { results: TestResult[]; summary: { 
   );
 }
 
-function DetailCard({ result: r }: { result: TestResult }) {
+function DetailCard({ result: r, sqlQuery }: { result: TestResult; sqlQuery?: string }) {
   const { theme } = useTheme();
   const dark = theme === "dark";
   const [expanded, setExpanded] = useState(false);
@@ -763,6 +849,7 @@ function DetailCard({ result: r }: { result: TestResult }) {
   const metricEntries = Object.entries(metrics).filter(
     ([k]) => !["table", "column", "columns", "expected_columns", "query"].includes(k)
   );
+  const isCustomSql = r.test_type === "custom_sql";
 
   return (
     <div
@@ -773,12 +860,12 @@ function DetailCard({ result: r }: { result: TestResult }) {
       }`}
       onClick={() => setExpanded(!expanded)}
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <span className={`text-xs ${dark ? "text-gray-600" : "text-gray-400"}`}>{expanded ? "▼" : "▶"}</span>
-          <span className={`font-medium ${dark ? "text-white" : "text-gray-900"}`}>{r.test_name}</span>
+          <span className={`font-medium truncate ${dark ? "text-white" : "text-gray-900"}`} title={r.test_name}>{r.test_name}</span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0">
           <StatusBadge status={r.status} />
           <SeverityBadge severity={r.severity} />
         </div>
@@ -799,7 +886,29 @@ function DetailCard({ result: r }: { result: TestResult }) {
       </div>
 
       {r.message && (
-        <p className={`text-sm mt-1.5 ml-6 ${dark ? "text-gray-400" : "text-gray-500"}`}>{r.message}</p>
+        <p
+          className={`text-sm mt-1.5 ml-6 ${expanded ? "" : "line-clamp-2"} ${dark ? "text-gray-400" : "text-gray-500"}`}
+          title={r.message}
+        >
+          {r.message}
+        </p>
+      )}
+
+      {expanded && isCustomSql && sqlQuery && (
+        <div className={`mt-3 ml-6 rounded-lg overflow-hidden border ${
+          dark ? "bg-gray-950 border-gray-800" : "bg-white border-gray-200"
+        }`}>
+          <div className={`px-4 py-2 border-b text-xs font-mono ${
+            dark ? "border-gray-800 text-gray-500" : "border-gray-200 text-gray-500"
+          }`}>
+            query
+          </div>
+          <pre className={`px-4 py-3 font-mono text-xs overflow-x-auto whitespace-pre max-h-64 overflow-y-auto ${
+            dark ? "text-gray-300" : "text-gray-700"
+          }`}>
+            <code>{sqlQuery}</code>
+          </pre>
+        </div>
       )}
 
       {expanded && metricEntries.length > 0 && (
@@ -807,7 +916,10 @@ function DetailCard({ result: r }: { result: TestResult }) {
           {metricEntries.map(([key, val]) => (
             <div key={key} className={`rounded-lg px-3 py-2 ${dark ? "bg-gray-900/50" : "bg-white border border-gray-200"}`}>
               <p className={`text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>{formatConfigKey(key)}</p>
-              <p className={`text-sm font-medium mt-0.5 ${dark ? "text-white" : "text-gray-900"}`}>
+              <p
+                className={`text-sm font-medium mt-0.5 truncate ${dark ? "text-white" : "text-gray-900"}`}
+                title={typeof val === "object" ? JSON.stringify(val) : String(val)}
+              >
                 {typeof val === "number"
                   ? val < 1 && val > 0
                     ? `${(val * 100).toFixed(1)}%`
