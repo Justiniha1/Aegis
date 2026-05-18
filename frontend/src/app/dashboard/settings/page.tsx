@@ -1,27 +1,49 @@
 "use client";
 
 import { useTheme } from "@/lib/theme";
+import { NEUTRAL_SCALE, BRAND_TEAL, STATUS_PALETTE } from "@/lib/constants";
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
+  const dark = theme === "dark";
+  const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
       <div>
-        <h1 className={`text-2xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+        <h1
+          className="text-heading"
+          style={{ color: palette.textPrimary }}
+        >
           Settings
         </h1>
-        <p className={`text-sm mt-1 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+        <p
+          className="text-body mt-1"
+          style={{ color: palette.textSecondary }}
+        >
           Customize your dashboard experience
         </p>
       </div>
 
       {/* Appearance */}
-      <section className={`rounded-xl border p-6 ${theme === "dark" ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"}`}>
-        <h2 className={`text-lg font-semibold mb-1 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+      <section
+        className="p-6"
+        style={{
+          backgroundColor: palette.surfaceElevated,
+          border: `1px solid ${palette.borderSubtle}`,
+          borderRadius: "8px",
+        }}
+      >
+        <h2
+          className="text-heading mb-1"
+          style={{ color: palette.textPrimary }}
+        >
           Appearance
         </h2>
-        <p className={`text-sm mb-5 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+        <p
+          className="text-body mb-5"
+          style={{ color: palette.textSecondary }}
+        >
           Choose how the dashboard looks
         </p>
 
@@ -29,27 +51,42 @@ export default function SettingsPage() {
           {/* Dark mode card */}
           <button
             onClick={() => setTheme("dark")}
-            className={`rounded-xl border-2 p-4 transition-all text-left ${
-              theme === "dark"
-                ? "border-blue-500 ring-1 ring-blue-500/30"
-                : "border-gray-200 hover:border-gray-300"
-            }`}
+            className="p-4 transition-all text-left"
+            style={{
+              backgroundColor: palette.surfaceElevated,
+              border: `2px solid ${theme === "dark" ? BRAND_TEAL : palette.borderSubtle}`,
+              borderRadius: "8px",
+              cursor: "pointer",
+            }}
           >
-            <div className="bg-gray-900 rounded-lg p-3 mb-3 border border-gray-700">
+            <div
+              className="p-3 mb-3"
+              style={{
+                backgroundColor: "#0B1220",
+                border: `1px solid #1E2A40`,
+                borderRadius: "6px",
+              }}
+            >
               <div className="flex gap-2 mb-2">
-                <div className="w-8 h-2 rounded bg-gray-700" />
-                <div className="w-12 h-2 rounded bg-gray-700" />
+                <div className="w-8 h-2 rounded" style={{ backgroundColor: "#1E2A40" }} />
+                <div className="w-12 h-2 rounded" style={{ backgroundColor: "#1E2A40" }} />
               </div>
               <div className="space-y-1.5">
-                <div className="h-2 rounded bg-green-500/40 w-3/4" />
-                <div className="h-2 rounded bg-red-500/40 w-1/2" />
-                <div className="h-2 rounded bg-yellow-500/40 w-2/3" />
+                <div className="h-2 rounded w-3/4" style={{ backgroundColor: `${STATUS_PALETTE.PASSED}66` }} />
+                <div className="h-2 rounded w-1/2" style={{ backgroundColor: `${STATUS_PALETTE.FAILED}66` }} />
+                <div className="h-2 rounded w-2/3" style={{ backgroundColor: `${STATUS_PALETTE.ERROR}66` }} />
               </div>
             </div>
-            <p className={`font-medium text-sm ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+            <p
+              className="text-body font-medium"
+              style={{ color: palette.textPrimary }}
+            >
               Dark
             </p>
-            <p className={`text-xs mt-0.5 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+            <p
+              className="text-caption mt-0.5"
+              style={{ color: palette.textSecondary, textTransform: "none", letterSpacing: "0" }}
+            >
               Easy on the eyes
             </p>
           </button>
@@ -57,41 +94,67 @@ export default function SettingsPage() {
           {/* Light mode card */}
           <button
             onClick={() => setTheme("light")}
-            className={`rounded-xl border-2 p-4 transition-all text-left ${
-              theme === "light"
-                ? "border-blue-500 ring-1 ring-blue-500/30"
-                : theme === "dark"
-                ? "border-gray-700 hover:border-gray-600"
-                : "border-gray-200 hover:border-gray-300"
-            }`}
+            className="p-4 transition-all text-left"
+            style={{
+              backgroundColor: palette.surfaceElevated,
+              border: `2px solid ${theme === "light" ? BRAND_TEAL : palette.borderSubtle}`,
+              borderRadius: "8px",
+              cursor: "pointer",
+            }}
           >
-            <div className="bg-gray-50 rounded-lg p-3 mb-3 border border-gray-200">
+            <div
+              className="p-3 mb-3"
+              style={{
+                backgroundColor: "#F7F9FB",
+                border: `1px solid #E4E8EE`,
+                borderRadius: "6px",
+              }}
+            >
               <div className="flex gap-2 mb-2">
-                <div className="w-8 h-2 rounded bg-gray-200" />
-                <div className="w-12 h-2 rounded bg-gray-200" />
+                <div className="w-8 h-2 rounded" style={{ backgroundColor: "#E4E8EE" }} />
+                <div className="w-12 h-2 rounded" style={{ backgroundColor: "#E4E8EE" }} />
               </div>
               <div className="space-y-1.5">
-                <div className="h-2 rounded bg-green-500/40 w-3/4" />
-                <div className="h-2 rounded bg-red-500/40 w-1/2" />
-                <div className="h-2 rounded bg-yellow-500/40 w-2/3" />
+                <div className="h-2 rounded w-3/4" style={{ backgroundColor: `${STATUS_PALETTE.PASSED}66` }} />
+                <div className="h-2 rounded w-1/2" style={{ backgroundColor: `${STATUS_PALETTE.FAILED}66` }} />
+                <div className="h-2 rounded w-2/3" style={{ backgroundColor: `${STATUS_PALETTE.ERROR}66` }} />
               </div>
             </div>
-            <p className={`font-medium text-sm ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+            <p
+              className="text-body font-medium"
+              style={{ color: palette.textPrimary }}
+            >
               Light
             </p>
-            <p className={`text-xs mt-0.5 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+            <p
+              className="text-caption mt-0.5"
+              style={{ color: palette.textSecondary, textTransform: "none", letterSpacing: "0" }}
+            >
               Classic bright mode
             </p>
           </button>
         </div>
       </section>
 
-      {/* Account info (placeholder) */}
-      <section className={`rounded-xl border p-6 ${theme === "dark" ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"}`}>
-        <h2 className={`text-lg font-semibold mb-1 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+      {/* Notifications (placeholder) */}
+      <section
+        className="p-6"
+        style={{
+          backgroundColor: palette.surfaceElevated,
+          border: `1px solid ${palette.borderSubtle}`,
+          borderRadius: "8px",
+        }}
+      >
+        <h2
+          className="text-heading mb-1"
+          style={{ color: palette.textPrimary }}
+        >
           Notifications
         </h2>
-        <p className={`text-sm mb-5 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+        <p
+          className="text-body mb-5"
+          style={{ color: palette.textSecondary }}
+        >
           Configure alert preferences
         </p>
 
@@ -118,7 +181,10 @@ export default function SettingsPage() {
             theme={theme}
           />
         </div>
-        <p className={`text-xs mt-4 italic ${theme === "dark" ? "text-gray-600" : "text-gray-400"}`}>
+        <p
+          className="text-caption mt-4 italic"
+          style={{ color: palette.textSecondary, textTransform: "none", letterSpacing: "0" }}
+        >
           Coming soon
         </p>
       </section>
@@ -141,27 +207,51 @@ function ToggleRow({
   theme: string;
   onChange?: (v: boolean) => void;
 }) {
+  const dark = theme === "dark";
+  const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
   return (
-    <div className={`flex items-center justify-between py-2 ${disabled ? "opacity-50" : ""}`}>
+    <div
+      className="flex items-center justify-between py-2"
+      style={{ opacity: disabled ? 0.5 : 1 }}
+    >
       <div>
-        <p className={`text-sm font-medium ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+        <p
+          className="text-body font-medium"
+          style={{ color: palette.textPrimary }}
+        >
           {label}
         </p>
-        <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+        <p
+          className="text-caption mt-0.5"
+          style={{ color: palette.textSecondary, textTransform: "none", letterSpacing: "0" }}
+        >
           {description}
         </p>
       </div>
       <button
         disabled={disabled}
         onClick={() => onChange?.(!enabled)}
-        className={`w-10 h-6 rounded-full relative transition-colors ${
-          enabled ? "bg-blue-500" : theme === "dark" ? "bg-gray-700" : "bg-gray-300"
-        }`}
+        className="relative transition-colors"
+        style={{
+          width: "40px",
+          height: "24px",
+          borderRadius: "9999px",
+          backgroundColor: enabled ? BRAND_TEAL : (dark ? "#374151" : "#D1D5DB"),
+          border: "none",
+          cursor: disabled ? "not-allowed" : "pointer",
+        }}
       >
         <div
-          className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-            enabled ? "left-5" : "left-1"
-          }`}
+          style={{
+            position: "absolute",
+            top: "4px",
+            left: enabled ? "20px" : "4px",
+            width: "16px",
+            height: "16px",
+            borderRadius: "9999px",
+            backgroundColor: "#FFFFFF",
+            transition: "left 120ms ease-in-out",
+          }}
         />
       </button>
     </div>

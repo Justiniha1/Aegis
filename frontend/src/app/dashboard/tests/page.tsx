@@ -1,12 +1,18 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { apiGet, apiGetText, apiDelete, apiPost, apiPut } from "@/lib/api";
-import { SeverityBadge } from "@/components/StatusBadge";
-import { TYPE_LABELS, formatConfigKey } from "@/lib/constants";
+import { SeverityBadge, TypePill } from "@/components/StatusBadge";
+import {
+  TYPE_LABELS,
+  formatConfigKey,
+  BRAND_NAVY,
+  NEUTRAL_SCALE,
+  STATUS_PALETTE,
+} from "@/lib/constants";
 import type { TestDefinition } from "@/lib/types";
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
@@ -30,6 +36,7 @@ export default function TestsPage() {
   const { token, isLoading: authLoading } = useAuth();
   const { theme } = useTheme();
   const dark = theme === "dark";
+  const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
   const router = useRouter();
   const [tests, setTests] = useState<TestDefinition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,7 +88,7 @@ export default function TestsPage() {
   if (loading || authLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className={dark ? "text-gray-400" : "text-gray-500"}>Loading tests...</p>
+        <p className="text-body" style={{ color: palette.textSecondary }}>Loading tests…</p>
       </div>
     );
   }
@@ -94,32 +101,52 @@ export default function TestsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className={`text-xl font-bold ${dark ? "text-white" : "text-gray-900"}`}>Test Definitions</h1>
-          <p className={`text-sm mt-0.5 ${dark ? "text-gray-500" : "text-gray-400"}`}>
+          <h1 className="text-heading" style={{ color: palette.textPrimary }}>Test Definitions</h1>
+          <p className="text-body mt-0.5" style={{ color: palette.textSecondary }}>
             {tests.length} tests · {enabledCount} enabled · {disabledCount} disabled
           </p>
         </div>
         <div className="flex items-center gap-3">
           {/* Tabs */}
-          <div className={`flex items-center rounded-lg p-0.5 gap-0.5 ${dark ? "bg-gray-800" : "bg-gray-100"}`}>
-            {([["table", "Tests"], ["yaml", "YAML Editor"]] as ["table" | "yaml", string][]).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setActiveTab(key)}
-                className={`text-xs px-3 py-1.5 rounded-md transition-all ${
-                  activeTab === key
-                    ? dark ? "bg-gray-700 text-white font-medium" : "bg-white text-gray-900 font-medium shadow-sm"
-                    : dark ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-900"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+          <div
+            className="flex items-center p-0.5 gap-0.5"
+            style={{
+              backgroundColor: palette.surfaceBg,
+              border: `1px solid ${palette.borderSubtle}`,
+              borderRadius: "8px",
+            }}
+          >
+            {([["table", "Tests"], ["yaml", "YAML Editor"]] as ["table" | "yaml", string][]).map(([key, label]) => {
+              const active = activeTab === key;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setActiveTab(key)}
+                  className="text-xs px-3 py-1.5 rounded-md transition-all"
+                  style={{
+                    backgroundColor: active ? palette.surfaceElevated : "transparent",
+                    color: active ? palette.textPrimary : palette.textSecondary,
+                    fontWeight: active ? 500 : 400,
+                    boxShadow: active ? "0 1px 2px rgb(0 0 0 / 0.06)" : "none",
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
           {activeTab === "table" && (
             <button
               onClick={() => setShowCreate(!showCreate)}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition-colors"
+              className="px-4 text-body font-medium transition-colors"
+              style={{
+                height: "36px",
+                backgroundColor: BRAND_NAVY,
+                color: "#FFFFFF",
+                border: "none",
+                borderRadius: "8px",
+                cursor: "pointer",
+              }}
             >
               {showCreate ? "Cancel" : "+ New Test"}
             </button>
@@ -151,24 +178,32 @@ function TestTable({
   onDelete: (id: number, name: string) => void;
   onToggle: (test: TestDefinition) => void;
 }) {
+  const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   return (
-    <div className={`rounded-xl border overflow-hidden ${dark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"}`}>
+    <div
+      className="overflow-hidden"
+      style={{
+        backgroundColor: palette.surfaceElevated,
+        border: `1px solid ${palette.borderSubtle}`,
+        borderRadius: "8px",
+      }}
+    >
       <table className="w-full text-sm">
-        <thead className={dark ? "bg-gray-800/50" : "bg-gray-50"}>
-          <tr className={`text-left ${dark ? "text-gray-400" : "text-gray-500"}`}>
-            <th className="px-6 py-3 font-medium w-8"></th>
-            <th className="px-6 py-3 font-medium">Name</th>
-            <th className="px-6 py-3 font-medium">Type</th>
-            <th className="px-6 py-3 font-medium">Table</th>
-            <th className="px-6 py-3 font-medium">Column(s)</th>
-            <th className="px-6 py-3 font-medium">Severity</th>
-            <th className="px-6 py-3 font-medium">Enabled</th>
-            <th className="px-6 py-3 font-medium">Actions</th>
+        <thead style={{ backgroundColor: palette.surfaceBg }}>
+          <tr style={{ color: palette.textSecondary }}>
+            <th className="px-2 py-3" style={{ width: "24px" }}></th>
+            <th className="px-4 py-3 text-left text-caption">Name</th>
+            <th className="px-4 py-3 text-left text-caption">Type</th>
+            <th className="px-4 py-3 text-left text-caption">Table</th>
+            <th className="px-4 py-3 text-left text-caption">Column(s)</th>
+            <th className="px-4 py-3 text-left text-caption">Severity</th>
+            <th className="px-4 py-3 text-left text-caption">Enabled</th>
+            <th className="px-4 py-3 text-left text-caption">Actions</th>
           </tr>
         </thead>
-        <tbody className={`divide-y ${dark ? "divide-gray-800" : "divide-gray-100"}`}>
+        <tbody style={{ borderTop: `1px solid ${palette.borderSubtle}` }}>
           {tests.map((t) => {
             const isExpanded = expandedId === t.id;
             const configEntries = Object.entries(t.config || {}).filter(
@@ -179,86 +214,197 @@ function TestTable({
             return (
               <Fragment key={t.id}>
                 <tr
-                  className={`transition-colors cursor-pointer ${
-                    dark ? "hover:bg-gray-800/30" : "hover:bg-gray-50"
-                  } ${!t.enabled ? "opacity-50" : ""}`}
+                  className="transition-colors cursor-pointer"
+                  style={{ height: "40px", opacity: t.enabled ? 1 : 0.5, borderTop: `1px solid ${palette.borderSubtle}` }}
                   onClick={() => setExpandedId(isExpanded ? null : t.id)}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLTableRowElement).style.backgroundColor = dark ? "rgba(232,236,243,0.04)" : "rgba(14,22,38,0.04)")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLTableRowElement).style.backgroundColor = "transparent")}
                 >
-                  <td className={`pl-6 py-3 text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>
+                  <td
+                    className="px-2 py-3 text-caption"
+                    style={{
+                      color: palette.textSecondary,
+                      textTransform: "none",
+                      letterSpacing: "0",
+                    }}
+                  >
                     {(configEntries.length > 0 || (isCustomSql && sqlQuery)) ? (isExpanded ? "▼" : "▶") : ""}
                   </td>
-                  <td className="px-6 py-3 max-w-xs">
-                    <div className={`line-clamp-2 ${dark ? "text-white" : "text-gray-900"}`} title={t.name}>{t.name}</div>
+
+                  {/* Name — verbatim per D-10; primary text neutral; JetBrains Mono; Body size */}
+                  <td className="px-4 py-3 max-w-xs">
+                    <div
+                      className="line-clamp-2 text-body"
+                      style={{
+                        fontFamily: "var(--font-jetbrains-mono)",
+                        color: palette.textPrimary,
+                      }}
+                      title={t.name}
+                    >
+                      {t.name}
+                    </div>
                     {t.description && (
                       <div
-                        className={`text-xs mt-0.5 line-clamp-1 ${dark ? "text-gray-500" : "text-gray-400"}`}
+                        className="text-caption mt-0.5 line-clamp-1"
+                        style={{
+                          color: palette.textSecondary,
+                          textTransform: "none",
+                          letterSpacing: "0",
+                        }}
                         title={t.description}
                       >
                         {t.description}
                       </div>
                     )}
                   </td>
-                  <td className={`px-6 py-3 ${dark ? "text-gray-400" : "text-gray-500"}`}>
-                    {TYPE_LABELS[t.type] ?? t.type}
-                  </td>
-                  <td className={`px-6 py-3 font-mono text-xs ${dark ? "text-gray-300" : "text-gray-600"}`}>
+
+                  {/* Type — TypePill */}
+                  <td className="px-4 py-3"><TypePill type={t.type} dark={dark} /></td>
+
+                  {/* Table — mono, verbatim per D-10 */}
+                  <td
+                    className="px-4 py-3 text-caption"
+                    style={{
+                      fontFamily: "var(--font-jetbrains-mono)",
+                      color: palette.textSecondary,
+                      textTransform: "none",
+                      letterSpacing: "0",
+                    }}
+                  >
                     {extractTable(t)}
                   </td>
-                  <td className={`px-6 py-3 font-mono text-xs ${dark ? "text-gray-300" : "text-gray-600"}`}>
+
+                  {/* Column(s) */}
+                  <td
+                    className="px-4 py-3 text-caption"
+                    style={{
+                      fontFamily: "var(--font-jetbrains-mono)",
+                      color: palette.textSecondary,
+                      textTransform: "none",
+                      letterSpacing: "0",
+                    }}
+                  >
                     {extractColumns(t)}
                   </td>
-                  <td className="px-6 py-3"><SeverityBadge severity={t.severity} /></td>
-                  <td className="px-6 py-3">
+
+                  <td className="px-4 py-3"><SeverityBadge severity={t.severity} /></td>
+
+                  {/* Enabled toggle — teal-when-on */}
+                  <td className="px-4 py-3">
                     <button
                       onClick={(e) => { e.stopPropagation(); onToggle(t); }}
-                      className={`w-9 h-5 rounded-full relative transition-colors ${
-                        t.enabled ? "bg-green-500" : dark ? "bg-gray-700" : "bg-gray-300"
-                      }`}
+                      className="relative transition-colors"
+                      style={{
+                        width: "36px",
+                        height: "20px",
+                        borderRadius: "9999px",
+                        backgroundColor: t.enabled
+                          ? STATUS_PALETTE.PASSED
+                          : (dark ? "#374151" : "#D1D5DB"),
+                        border: "none",
+                        cursor: "pointer",
+                      }}
+                      aria-label={t.enabled ? "Disable test" : "Enable test"}
                     >
-                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-                        t.enabled ? "left-4" : "left-0.5"
-                      }`} />
+                      <span
+                        style={{
+                          position: "absolute",
+                          top: "2px",
+                          left: t.enabled ? "18px" : "2px",
+                          width: "16px",
+                          height: "16px",
+                          borderRadius: "9999px",
+                          backgroundColor: "#FFFFFF",
+                          transition: "left 120ms ease-in-out",
+                        }}
+                      />
                     </button>
                   </td>
-                  <td className="px-6 py-3">
+
+                  {/* Actions */}
+                  <td className="px-4 py-3">
                     <button
                       onClick={(e) => { e.stopPropagation(); onDelete(t.id, t.name); }}
-                      className="text-xs text-red-400 hover:text-red-300 font-medium"
+                      className="text-body font-medium transition-colors"
+                      style={{ color: STATUS_PALETTE.FAILED }}
+                      onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "0.7")}
+                      onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "1")}
                     >
                       Delete
                     </button>
                   </td>
                 </tr>
                 {isExpanded && (configEntries.length > 0 || (isCustomSql && sqlQuery)) && (
-                  <tr>
-                    <td colSpan={8} className={`px-12 py-3 ${dark ? "bg-gray-800/20" : "bg-gray-50"}`}>
+                  <tr style={{ borderTop: `1px solid ${palette.borderSubtle}` }}>
+                    <td
+                      colSpan={8}
+                      className="px-12 py-3"
+                      style={{ backgroundColor: palette.surfaceBg }}
+                    >
                       {isCustomSql && (
-                        <div className={`mt-3 rounded-lg overflow-hidden border ${
-                          dark ? "bg-gray-950 border-gray-800" : "bg-gray-50 border-gray-200"
-                        }`}>
-                          <div className={`px-4 py-2 border-b text-xs font-mono ${
-                            dark ? "border-gray-800 text-gray-500" : "border-gray-200 text-gray-500"
-                          }`}>
+                        <div
+                          className="mt-3 overflow-hidden"
+                          style={{
+                            backgroundColor: palette.surfaceBg,
+                            border: `1px solid ${palette.borderSubtle}`,
+                            borderRadius: "8px",
+                          }}
+                        >
+                          <div
+                            className="px-4 py-2 text-caption"
+                            style={{
+                              borderBottom: `1px solid ${palette.borderSubtle}`,
+                              color: palette.textSecondary,
+                              fontFamily: "var(--font-jetbrains-mono)",
+                              textTransform: "none",
+                              letterSpacing: "0",
+                            }}
+                          >
                             query
                           </div>
-                          <pre className={`px-4 py-3 font-mono text-xs overflow-x-auto whitespace-pre max-h-80 overflow-y-auto ${
-                            dark ? "text-gray-300" : "text-gray-700"
-                          }`}>
+                          <pre
+                            className="px-4 py-3 font-mono text-xs overflow-x-auto whitespace-pre max-h-80 overflow-y-auto"
+                            style={{ color: palette.textPrimary }}
+                          >
                             <code>{sqlQuery || "(no query defined)"}</code>
                           </pre>
                         </div>
                       )}
                       <div className="grid grid-cols-4 gap-3">
-                        <div className={`rounded-lg px-3 py-2 ${dark ? "bg-gray-900/50" : "bg-white border border-gray-200"}`}>
-                          <p className={`text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>profile</p>
-                          <p className={`text-sm font-medium mt-0.5 ${dark ? "text-white" : "text-gray-900"}`}>{t.profile}</p>
+                        <div
+                          className="px-3 py-2"
+                          style={{
+                            backgroundColor: palette.surfaceElevated,
+                            border: `1px solid ${palette.borderSubtle}`,
+                            borderRadius: "8px",
+                          }}
+                        >
+                          <p className="text-caption" style={{ color: palette.textSecondary }}>profile</p>
+                          <p className="text-body font-medium mt-0.5" style={{ color: palette.textPrimary }}>{t.profile}</p>
                         </div>
                         {t.tags.length > 0 && (
-                          <div className={`rounded-lg px-3 py-2 ${dark ? "bg-gray-900/50" : "bg-white border border-gray-200"}`}>
-                            <p className={`text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>tags</p>
+                          <div
+                            className="px-3 py-2"
+                            style={{
+                              backgroundColor: palette.surfaceElevated,
+                              border: `1px solid ${palette.borderSubtle}`,
+                              borderRadius: "8px",
+                            }}
+                          >
+                            <p className="text-caption" style={{ color: palette.textSecondary }}>tags</p>
                             <div className="flex flex-wrap gap-1 mt-1">
                               {t.tags.map((tag) => (
-                                <span key={tag} className={`text-xs px-1.5 py-0.5 rounded ${dark ? "bg-gray-800 text-gray-400" : "bg-gray-100 text-gray-600"}`}>
+                                <span
+                                  key={tag}
+                                  className="text-caption px-1.5 py-0.5"
+                                  style={{
+                                    backgroundColor: palette.surfaceBg,
+                                    color: palette.textSecondary,
+                                    borderRadius: "4px",
+                                    textTransform: "none",
+                                    letterSpacing: "0",
+                                  }}
+                                >
                                   {tag}
                                 </span>
                               ))}
@@ -266,10 +412,19 @@ function TestTable({
                           </div>
                         )}
                         {configEntries.map(([key, val]) => (
-                          <div key={key} className={`rounded-lg px-3 py-2 ${dark ? "bg-gray-900/50" : "bg-white border border-gray-200"}`}>
-                            <p className={`text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>{formatConfigKey(key)}</p>
+                          <div
+                            key={key}
+                            className="px-3 py-2"
+                            style={{
+                              backgroundColor: palette.surfaceElevated,
+                              border: `1px solid ${palette.borderSubtle}`,
+                              borderRadius: "8px",
+                            }}
+                          >
+                            <p className="text-caption" style={{ color: palette.textSecondary }}>{formatConfigKey(key)}</p>
                             <p
-                              className={`text-sm font-medium mt-0.5 truncate ${dark ? "text-white" : "text-gray-900"}`}
+                              className="text-body font-medium mt-0.5 truncate"
+                              style={{ color: palette.textPrimary }}
                               title={typeof val === "object" ? JSON.stringify(val) : String(val)}
                             >
                               {typeof val === "object" ? JSON.stringify(val) : String(val)}
@@ -286,8 +441,19 @@ function TestTable({
         </tbody>
       </table>
       {tests.length === 0 && (
-        <div className={`px-6 py-12 text-center ${dark ? "text-gray-500" : "text-gray-400"}`}>
-          No test definitions yet. Click &quot;+ New Test&quot; to create one.
+        <div
+          className="px-6 py-12 text-center"
+          style={{ color: palette.textSecondary }}
+        >
+          <p
+            className="text-heading"
+            style={{ color: palette.textPrimary }}
+          >
+            No tests configured yet
+          </p>
+          <p className="text-body mt-2">
+            Add a test in the YAML editor to start checking your data.
+          </p>
         </div>
       )}
     </div>
@@ -296,6 +462,7 @@ function TestTable({
 
 /* ── YAML Editor ──────────────────────────────────────────────────────────── */
 function YamlEditor({ token, dark, onSaved }: { token: string; dark: boolean; onSaved: () => void }) {
+  const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
   const [yamlContent, setYamlContent] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -316,7 +483,6 @@ function YamlEditor({ token, dark, onSaved }: { token: string; dark: boolean; on
       const msg = `Sync complete: ${result.created} created, ${result.updated} updated, ${result.deleted} deleted, ${result.unchanged} unchanged`;
       setFeedback({ type: "success", message: msg });
       onSaved();
-      // Reload the YAML to show the normalized version from the DB
       const refreshed = await apiGetText("/api/v1/tests/yaml", token);
       setYamlContent(refreshed);
     } catch (err) {
@@ -329,7 +495,7 @@ function YamlEditor({ token, dark, onSaved }: { token: string; dark: boolean; on
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className={dark ? "text-gray-400" : "text-gray-500"}>Loading YAML...</p>
+        <p className="text-body" style={{ color: palette.textSecondary }}>Loading YAML…</p>
       </div>
     );
   }
@@ -337,31 +503,69 @@ function YamlEditor({ token, dark, onSaved }: { token: string; dark: boolean; on
   return (
     <div className="space-y-4">
       {/* Warning banner */}
-      <div className={`rounded-lg px-4 py-3 text-sm flex items-center gap-2 ${dark ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20" : "bg-yellow-50 text-yellow-700 border border-yellow-200"}`}>
-        <span>⚠️</span>
+      <div
+        className="px-4 py-3 text-body flex items-center gap-2"
+        style={{
+          backgroundColor: `${STATUS_PALETTE.ERROR}1A`,
+          border: `1px solid ${STATUS_PALETTE.ERROR}40`,
+          borderRadius: "8px",
+          color: STATUS_PALETTE.ERROR,
+        }}
+      >
+        <span aria-hidden="true">⚠</span>
         <span>Saving will sync all test definitions with the database. Tests removed from the YAML will be deleted.</span>
       </div>
 
       {/* Editor */}
-      <div className={`rounded-xl border overflow-hidden ${dark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"}`}>
-        <div className={`px-4 py-3 border-b flex items-center justify-between ${dark ? "border-gray-800" : "border-gray-200"}`}>
-          <p className={`text-sm font-medium ${dark ? "text-gray-300" : "text-gray-700"}`}>test_definitions.yaml</p>
+      <div
+        className="overflow-hidden"
+        style={{
+          backgroundColor: palette.surfaceElevated,
+          border: `1px solid ${palette.borderSubtle}`,
+          borderRadius: "8px",
+        }}
+      >
+        <div
+          className="px-4 py-3 flex items-center justify-between"
+          style={{ borderBottom: `1px solid ${palette.borderSubtle}` }}
+        >
+          <p
+            className="text-body"
+            style={{
+              fontFamily: "var(--font-jetbrains-mono)",
+              color: palette.textPrimary,
+            }}
+          >
+            test_definitions.yaml
+          </p>
           <div className="flex items-center gap-3">
             {feedback && (
-              <span className={`text-xs ${
-                feedback.type === "success"
-                  ? dark ? "text-green-400" : "text-green-600"
-                  : dark ? "text-red-400" : "text-red-600"
-              }`}>
+              <span
+                className="text-caption"
+                style={{
+                  color: feedback.type === "success" ? STATUS_PALETTE.PASSED : STATUS_PALETTE.FAILED,
+                  textTransform: "none",
+                  letterSpacing: "0",
+                }}
+              >
                 {feedback.message}
               </span>
             )}
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-4 py-1.5 bg-green-600 hover:bg-green-500 disabled:bg-green-800 text-white text-sm rounded-lg transition-colors"
+              className="text-body font-medium px-4 transition-colors"
+              style={{
+                height: "36px",
+                backgroundColor: BRAND_NAVY,
+                color: "#FFFFFF",
+                border: "none",
+                borderRadius: "8px",
+                cursor: saving ? "not-allowed" : "pointer",
+                opacity: saving ? 0.5 : 1,
+              }}
             >
-              {saving ? "Saving..." : "Save & Sync"}
+              {saving ? "Saving…" : "Save & Sync"}
             </button>
           </div>
         </div>
@@ -369,12 +573,14 @@ function YamlEditor({ token, dark, onSaved }: { token: string; dark: boolean; on
           value={yamlContent}
           onChange={(e) => { setYamlContent(e.target.value); setFeedback(null); }}
           spellCheck={false}
-          className={`w-full h-[600px] px-6 py-4 font-mono text-sm resize-none focus:outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500 ${
-            dark
-              ? "bg-gray-950 text-gray-300 placeholder-gray-600"
-              : "bg-gray-50 text-gray-800 placeholder-gray-400"
-          }`}
-          placeholder="# Paste or edit your YAML test definitions here..."
+          className="w-full h-[600px] px-6 py-4 text-body resize-none focus:outline-none"
+          style={{
+            fontFamily: "var(--font-jetbrains-mono)",
+            backgroundColor: palette.surfaceBg,
+            color: palette.textPrimary,
+            border: "none",
+          }}
+          placeholder="# Paste or edit your YAML test definitions here…"
         />
       </div>
     </div>
@@ -426,8 +632,82 @@ function buildYamlPreview(f: {
   return lines.join("\n");
 }
 
+/* ── Page-local form primitives — single source of truth for input/label/select styling.
+   Per CONVENTIONS.md §"Module Design": page-local sub-components stay in the page file.
+   Created in Plan 04 to eliminate the bulk-edit partial-coverage risk of inlining
+   style props across ~15 inputs + ~15 labels + selects (WARNING 1 from planner revision). */
+
+function TestFormInput({
+  dark,
+  ...rest
+}: React.InputHTMLAttributes<HTMLInputElement> & { dark: boolean }) {
+  const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
+  return (
+    <input
+      {...rest}
+      className={`w-full px-3 text-body focus:outline-none transition-colors ${rest.className ?? ""}`}
+      style={{
+        height: "36px",
+        backgroundColor: dark ? palette.surfaceBg : palette.surfaceElevated,
+        border: `1px solid ${palette.borderSubtle}`,
+        borderRadius: "8px",
+        color: palette.textPrimary,
+        ...(rest.style ?? {}),
+      }}
+    />
+  );
+}
+
+function TestFormSelect({
+  dark,
+  children,
+  ...rest
+}: React.SelectHTMLAttributes<HTMLSelectElement> & { dark: boolean }) {
+  const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
+  return (
+    <select
+      {...rest}
+      className={`w-full px-3 text-body focus:outline-none transition-colors ${rest.className ?? ""}`}
+      style={{
+        height: "36px",
+        backgroundColor: dark ? palette.surfaceBg : palette.surfaceElevated,
+        border: `1px solid ${palette.borderSubtle}`,
+        borderRadius: "8px",
+        color: palette.textPrimary,
+        ...(rest.style ?? {}),
+      }}
+    >
+      {children}
+    </select>
+  );
+}
+
+function TestFormLabel({
+  dark,
+  children,
+  ...rest
+}: React.LabelHTMLAttributes<HTMLLabelElement> & { dark: boolean }) {
+  const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
+  return (
+    <label
+      {...rest}
+      className={`block text-caption mb-1 ${rest.className ?? ""}`}
+      style={{
+        color: palette.textSecondary,
+        textTransform: "none",
+        letterSpacing: "0",
+        fontWeight: 500,
+        ...(rest.style ?? {}),
+      }}
+    >
+      {children}
+    </label>
+  );
+}
+
 /* ── Create Form ──────────────────────────────────────────────────────────── */
 function CreateTestForm({ token, dark, onCreated }: { token: string; dark: boolean; onCreated: () => void }) {
+  const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState("null_check");
@@ -448,12 +728,6 @@ function CreateTestForm({ token, dark, onCreated }: { token: string; dark: boole
   const [submitting, setSubmitting] = useState(false);
 
   const formState = { name, description, type, severity, profile, table, column, threshold, query, minRows, maxRows, minValue, maxValue, refTable, refColumn, expectedColumns };
-
-  const inputCls = `w-full px-3 py-2 rounded-lg text-sm border focus:outline-none focus:border-blue-500 ${
-    dark ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500" : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-  }`;
-
-  const labelCls = `block text-xs font-medium mb-1 ${dark ? "text-gray-400" : "text-gray-600"}`;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -499,8 +773,15 @@ function CreateTestForm({ token, dark, onCreated }: { token: string; dark: boole
   const showQuery = type === "custom_sql";
 
   return (
-    <div className={`rounded-xl border p-6 ${dark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"}`}>
-      <h2 className={`font-medium mb-4 ${dark ? "text-white" : "text-gray-900"}`}>Create Test</h2>
+    <div
+      className="p-6"
+      style={{
+        backgroundColor: palette.surfaceElevated,
+        border: `1px solid ${palette.borderSubtle}`,
+        borderRadius: "8px",
+      }}
+    >
+      <h2 className="text-heading mb-4" style={{ color: palette.textPrimary }}>Create Test</h2>
       <div className="grid grid-cols-5 gap-6">
         {/* Left: form */}
         <div className="col-span-3">
@@ -508,36 +789,36 @@ function CreateTestForm({ token, dark, onCreated }: { token: string; dark: boole
             {/* Row 1: Name + Type + Severity */}
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-1">
-                <label className={labelCls}>Name *</label>
-                <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="Customer Email Null Check" className={inputCls} />
+                <TestFormLabel dark={dark}>Name *</TestFormLabel>
+                <TestFormInput dark={dark} value={name} onChange={(e) => setName(e.target.value)} required placeholder="Customer Email Null Check" />
               </div>
               <div>
-                <label className={labelCls}>Type</label>
-                <select value={type} onChange={(e) => setType(e.target.value)} className={inputCls}>
+                <TestFormLabel dark={dark}>Type</TestFormLabel>
+                <TestFormSelect dark={dark} value={type} onChange={(e) => setType(e.target.value)}>
                   {TEST_TYPES.map((t) => <option key={t} value={t}>{TYPE_LABELS[t] ?? t}</option>)}
-                </select>
+                </TestFormSelect>
               </div>
               <div>
-                <label className={labelCls}>Severity</label>
-                <select value={severity} onChange={(e) => setSeverity(e.target.value)} className={inputCls}>
+                <TestFormLabel dark={dark}>Severity</TestFormLabel>
+                <TestFormSelect dark={dark} value={severity} onChange={(e) => setSeverity(e.target.value)}>
                   <option>LOW</option><option>MEDIUM</option><option>HIGH</option><option>CRITICAL</option>
-                </select>
+                </TestFormSelect>
               </div>
             </div>
 
             {/* Row 2: Description + Profile */}
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-2">
-                <label className={labelCls}>Description (optional)</label>
-                <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What this test checks..." className={inputCls} />
+                <TestFormLabel dark={dark}>Description (optional)</TestFormLabel>
+                <TestFormInput dark={dark} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What this test checks…" />
               </div>
               <div>
-                <label className={labelCls}>Profile</label>
-                <select value={profile} onChange={(e) => setProfile(e.target.value)} className={inputCls}>
+                <TestFormLabel dark={dark}>Profile</TestFormLabel>
+                <TestFormSelect dark={dark} value={profile} onChange={(e) => setProfile(e.target.value)}>
                   <option value="dev">dev</option>
                   <option value="staging">staging</option>
                   <option value="prod">prod</option>
-                </select>
+                </TestFormSelect>
               </div>
             </div>
 
@@ -545,13 +826,13 @@ function CreateTestForm({ token, dark, onCreated }: { token: string; dark: boole
             {!showQuery && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Table *</label>
-                  <input value={table} onChange={(e) => setTable(e.target.value)} required placeholder="customers" className={inputCls} />
+                  <TestFormLabel dark={dark}>Table *</TestFormLabel>
+                  <TestFormInput dark={dark} value={table} onChange={(e) => setTable(e.target.value)} required placeholder="customers" />
                 </div>
                 {showColumn && (
                   <div>
-                    <label className={labelCls}>Column</label>
-                    <input value={column} onChange={(e) => setColumn(e.target.value)} placeholder="email" className={inputCls} />
+                    <TestFormLabel dark={dark}>Column</TestFormLabel>
+                    <TestFormInput dark={dark} value={column} onChange={(e) => setColumn(e.target.value)} placeholder="email" />
                   </div>
                 )}
               </div>
@@ -561,8 +842,8 @@ function CreateTestForm({ token, dark, onCreated }: { token: string; dark: boole
             {showThreshold && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Null Threshold (0–1)</label>
-                  <input value={threshold} onChange={(e) => setThreshold(e.target.value)} type="number" step="0.01" min="0" max="1" placeholder="0.02 = allow 2% nulls" className={inputCls} />
+                  <TestFormLabel dark={dark}>Null Threshold (0–1)</TestFormLabel>
+                  <TestFormInput dark={dark} value={threshold} onChange={(e) => setThreshold(e.target.value)} type="number" step="0.01" min="0" max="1" placeholder="0.02 = allow 2% nulls" />
                 </div>
               </div>
             )}
@@ -570,12 +851,12 @@ function CreateTestForm({ token, dark, onCreated }: { token: string; dark: boole
             {showRangeMinMax && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Min Value</label>
-                  <input value={minValue} onChange={(e) => setMinValue(e.target.value)} type="number" placeholder="0" className={inputCls} />
+                  <TestFormLabel dark={dark}>Min Value</TestFormLabel>
+                  <TestFormInput dark={dark} value={minValue} onChange={(e) => setMinValue(e.target.value)} type="number" placeholder="0" />
                 </div>
                 <div>
-                  <label className={labelCls}>Max Value</label>
-                  <input value={maxValue} onChange={(e) => setMaxValue(e.target.value)} type="number" placeholder="1000" className={inputCls} />
+                  <TestFormLabel dark={dark}>Max Value</TestFormLabel>
+                  <TestFormInput dark={dark} value={maxValue} onChange={(e) => setMaxValue(e.target.value)} type="number" placeholder="1000" />
                 </div>
               </div>
             )}
@@ -583,12 +864,12 @@ function CreateTestForm({ token, dark, onCreated }: { token: string; dark: boole
             {showRowCount && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Min Rows</label>
-                  <input value={minRows} onChange={(e) => setMinRows(e.target.value)} type="number" min="0" placeholder="1" className={inputCls} />
+                  <TestFormLabel dark={dark}>Min Rows</TestFormLabel>
+                  <TestFormInput dark={dark} value={minRows} onChange={(e) => setMinRows(e.target.value)} type="number" min="0" placeholder="1" />
                 </div>
                 <div>
-                  <label className={labelCls}>Max Rows (optional)</label>
-                  <input value={maxRows} onChange={(e) => setMaxRows(e.target.value)} type="number" min="0" placeholder="leave blank for no max" className={inputCls} />
+                  <TestFormLabel dark={dark}>Max Rows (optional)</TestFormLabel>
+                  <TestFormInput dark={dark} value={maxRows} onChange={(e) => setMaxRows(e.target.value)} type="number" min="0" placeholder="leave blank for no max" />
                 </div>
               </div>
             )}
@@ -596,53 +877,105 @@ function CreateTestForm({ token, dark, onCreated }: { token: string; dark: boole
             {showRelationship && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Reference Table</label>
-                  <input value={refTable} onChange={(e) => setRefTable(e.target.value)} placeholder="orders" className={inputCls} />
+                  <TestFormLabel dark={dark}>Reference Table</TestFormLabel>
+                  <TestFormInput dark={dark} value={refTable} onChange={(e) => setRefTable(e.target.value)} placeholder="orders" />
                 </div>
                 <div>
-                  <label className={labelCls}>Reference Column</label>
-                  <input value={refColumn} onChange={(e) => setRefColumn(e.target.value)} placeholder="customer_id" className={inputCls} />
+                  <TestFormLabel dark={dark}>Reference Column</TestFormLabel>
+                  <TestFormInput dark={dark} value={refColumn} onChange={(e) => setRefColumn(e.target.value)} placeholder="customer_id" />
                 </div>
               </div>
             )}
 
             {showExpectedColumns && (
               <div>
-                <label className={labelCls}>Expected Columns (comma-separated)</label>
-                <input value={expectedColumns} onChange={(e) => setExpectedColumns(e.target.value)} placeholder="id, name, email, created_at" className={inputCls} />
+                <TestFormLabel dark={dark}>Expected Columns (comma-separated)</TestFormLabel>
+                <TestFormInput dark={dark} value={expectedColumns} onChange={(e) => setExpectedColumns(e.target.value)} placeholder="id, name, email, created_at" />
               </div>
             )}
 
             {showQuery && (
               <div>
-                <label className={labelCls}>SQL Query *</label>
+                <TestFormLabel dark={dark}>SQL Query *</TestFormLabel>
                 <textarea
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   rows={6}
                   required
                   placeholder={"SELECT COUNT(*) AS result\nFROM customers\nWHERE status NOT IN ('active', 'inactive')"}
-                  className={`${inputCls} font-mono resize-y`}
+                  className="w-full px-3 py-2 text-body resize-y focus:outline-none"
+                  style={{
+                    fontFamily: "var(--font-jetbrains-mono)",
+                    backgroundColor: dark ? palette.surfaceBg : palette.surfaceElevated,
+                    border: `1px solid ${palette.borderSubtle}`,
+                    borderRadius: "8px",
+                    color: palette.textPrimary,
+                  }}
                 />
-                <p className={`text-xs mt-1 ${dark ? "text-gray-600" : "text-gray-400"}`}>Query must return a single numeric value. Non-zero = test fails.</p>
+                <p
+                  className="text-caption mt-1"
+                  style={{
+                    color: palette.textSecondary,
+                    textTransform: "none",
+                    letterSpacing: "0",
+                  }}
+                >
+                  Query must return a single numeric value. Non-zero = test fails.
+                </p>
               </div>
             )}
 
             <div className="flex items-center gap-3 pt-1">
-              <button type="submit" disabled={submitting} className="px-4 py-2 bg-green-600 hover:bg-green-500 disabled:bg-green-800 text-white text-sm rounded-lg transition-colors">
-                {submitting ? "Creating..." : "Create Test"}
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-4 text-body font-medium transition-colors"
+                style={{
+                  height: "36px",
+                  backgroundColor: BRAND_NAVY,
+                  color: "#FFFFFF",
+                  border: "none",
+                  borderRadius: "8px",
+                  cursor: submitting ? "not-allowed" : "pointer",
+                  opacity: submitting ? 0.5 : 1,
+                }}
+              >
+                {submitting ? "Creating…" : "Create test"}
               </button>
-              {error && <span className="text-red-400 text-sm">{error}</span>}
+              {error && (
+                <span
+                  className="text-body"
+                  style={{ color: STATUS_PALETTE.FAILED }}
+                >
+                  {error}
+                </span>
+              )}
             </div>
           </form>
         </div>
 
         {/* Right: live YAML preview */}
         <div className="col-span-2">
-          <p className={`text-xs font-medium mb-2 ${dark ? "text-gray-400" : "text-gray-600"}`}>YAML Preview</p>
-          <pre className={`rounded-lg p-4 font-mono text-xs leading-relaxed overflow-auto h-[calc(100%-2rem)] min-h-[200px] ${
-            dark ? "bg-gray-950 text-gray-300 border border-gray-800" : "bg-gray-50 text-gray-700 border border-gray-200"
-          }`}>
+          <p
+            className="text-caption mb-2"
+            style={{
+              color: palette.textSecondary,
+              textTransform: "none",
+              letterSpacing: "0",
+              fontWeight: 500,
+            }}
+          >
+            YAML Preview
+          </p>
+          <pre
+            className="p-4 font-mono text-xs leading-relaxed overflow-auto h-[calc(100%-2rem)] min-h-[200px]"
+            style={{
+              backgroundColor: palette.surfaceBg,
+              color: palette.textPrimary,
+              border: `1px solid ${palette.borderSubtle}`,
+              borderRadius: "8px",
+            }}
+          >
             {buildYamlPreview(formState)}
           </pre>
         </div>
