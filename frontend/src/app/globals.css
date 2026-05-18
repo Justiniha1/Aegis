@@ -8,8 +8,83 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
+
+  /* Type scale (locked per UI-SPEC.md §Typography — 4 sizes / 2 weights / locked line-heights) */
+  /* D-12: applied uniformly across every page, defined in one place. */
+  --text-caption: 11px;
+  --text-body: 14px;
+  --text-heading: 20px;
+  --text-display: 28px;
+  --leading-caption: 1.4;
+  --leading-body: 1.5;
+  --leading-heading: 1.3;
+  --leading-display: 1.2;
+  /* Weights inherited via Tailwind font-normal (400) / font-semibold (600). */
+  /* Caption is tracked-out: */
+  --tracking-caption: 0.08em;
+
+  /* Brand (locked per UI-SPEC.md §Color) */
+  --color-brand-navy: #042C53;
+  --color-brand-teal: #1D9E75;
+
+  /* Neutrals — light theme (cool-leaning, per UI-SPEC.md §Neutrals) */
+  --color-surface-bg: #F7F9FB;
+  --color-surface-elevated: #FFFFFF;
+  --color-border-subtle: #E4E8EE;
+  --color-text-secondary: #5A6577;
+  --color-text-primary: #0E1626;
+
+  /* Status (per UI-SPEC.md §Status) */
+  --color-status-pass: #22C55E;
+  --color-status-warn: #F59E0B;
+  --color-status-fail: #EF4444;
+  --color-status-neutral: #6B7280;
+
+  /* Destructive (per UI-SPEC.md §Destructive) */
+  --color-destructive: #D9544F;
+
+  /* Per-test-type pill palette (8 entries per UI-SPEC.md §Per-test-type pill palette) */
+  --color-pill-null-check: #3B82F6;
+  --color-pill-duplicate-check: #F59E0B;
+  --color-pill-schema-check: #1D9E75;
+  --color-pill-range-check: #EF4444;
+  --color-pill-row-count: #A855F7;
+  --color-pill-unique-check: #7C3AED;
+  --color-pill-relationship-check: #06B6D4;
+  --color-pill-custom-sql: #475569;
+
+  /* Sidebar active-state mid-navy (per UI-SPEC.md §Sidebar active state) */
+  --color-sidebar-active: #0B3A66;
+}
+
+/* ── Type-scale utility classes (locked per UI-SPEC §Typography) ─────────────
+   Consumed by Plans 03/04/05 — do NOT inline fontSize / lineHeight per page.
+   Caption is uppercase + tracked-out; weight comes from Tailwind font-normal /
+   font-semibold or explicit utility (font-semibold is included on caption + display + heading;
+   body inherits font-normal). */
+.text-caption {
+  font-size: var(--text-caption);
+  line-height: var(--leading-caption);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caption);
+}
+.text-body {
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  font-weight: 400;
+}
+.text-heading {
+  font-size: var(--text-heading);
+  line-height: var(--leading-heading);
+  font-weight: 600;
+}
+.text-display {
+  font-size: var(--text-display);
+  line-height: var(--leading-display);
+  font-weight: 600;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -19,8 +94,16 @@
   }
 }
 
+.dark, [data-theme="dark"] {
+  --color-surface-bg: #0B1220;
+  --color-surface-elevated: #0F1A2E;
+  --color-border-subtle: #1E2A40;
+  --color-text-secondary: #8B95A8;
+  --color-text-primary: #E8ECF3;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
 }
