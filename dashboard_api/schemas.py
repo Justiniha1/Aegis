@@ -107,3 +107,46 @@ class TestDefinitionOut(BaseModel):
 
 class YamlImport(BaseModel):
     yaml_content: str              # raw YAML string pasted or uploaded by the user
+
+
+# ── Runs (Phase 2) ────────────────────────────────────────────────────────────
+
+RunStatus = Literal["QUEUED", "RUNNING", "COMPLETE", "FAILED"]
+
+
+class RunCreate(BaseModel):
+    profile: str
+    type_filter: Optional[list[str]] = None   # None = "all enabled tests"
+
+
+class RunErrorDetail(BaseModel):
+    reason: str
+    at_test: Optional[int] = None
+
+
+class RunOut(BaseModel):
+    id: int
+    client_id: int
+    profile: str
+    type_filter: Optional[list[str]] = None
+    status: RunStatus
+    total_tests: int
+    completed_tests: int
+    started_at: datetime
+    completed_at: Optional[datetime] = None
+    error: Optional[RunErrorDetail] = None     # composed from error_reason + error_at_test
+
+    model_config = {"from_attributes": False}  # composed manually in the router — see 02-02
+
+
+class RunTriggerOut(BaseModel):
+    run_id: int
+    total_tests: int
+    status: RunStatus
+
+
+# ── Profiles (Phase 2) ────────────────────────────────────────────────────────
+
+class ProfileOut(BaseModel):
+    name: str
+    is_default: bool = False

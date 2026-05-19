@@ -32,6 +32,7 @@ class TestResult(Base):
     severity = Column(String, nullable=False)     # LOW / MEDIUM / HIGH / CRITICAL
     metrics = Column(JSON)
     message = Column(String)
+    run_id = Column(Integer, ForeignKey("runs.id"), nullable=True, index=True)
     run_at = Column(DateTime, nullable=False, index=True)
 
     __table_args__ = (Index("ix_results_client_run", "client_id", "run_at"),)
@@ -56,3 +57,21 @@ class TestDefinition(Base):
     updated_at = Column(DateTime, default=datetime.utcnow)
 
     client = relationship("Client", back_populates="test_definitions")
+
+
+class Run(Base):
+    __tablename__ = "runs"
+
+    id = Column(Integer, primary_key=True)
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False, index=True)
+    profile = Column(String, nullable=False)
+    type_filter = Column(JSON, nullable=True)        # list[str] of test types, or None for "all"
+    status = Column(String, nullable=False, default="QUEUED")   # QUEUED / RUNNING / COMPLETE / FAILED
+    total_tests = Column(Integer, nullable=False, default=0)
+    completed_tests = Column(Integer, nullable=False, default=0)
+    started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    completed_at = Column(DateTime, nullable=True)
+    error_reason = Column(String, nullable=True)     # D-17 specificity contract — populated on FAILED
+    error_at_test = Column(Integer, nullable=True)   # 1-indexed test number that errored (D-15)
+
+    __table_args__ = (Index("ix_runs_client_started", "client_id", "started_at"),)
