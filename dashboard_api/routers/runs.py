@@ -1,15 +1,29 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from dashboard_api import models, schemas
 from dashboard_api.auth import get_current_client_jwt
 from dashboard_api.database import get_db
+from dashboard_api.profile_loader import load_profile_names
+from dashboard_api.run_executor import execute_run
 
 router = APIRouter(prefix="/api/v1/runs", tags=["runs"])
 
+# The 8 builtin test types — must match TYPE_LABELS keys in frontend/src/lib/constants.ts.
+# Server-side whitelist for type_filter input validation (security_constraints).
+_ALLOWED_TYPE_FILTERS = frozenset({
+    "null_check",
+    "duplicate_check",
+    "unique_check",
+    "row_count",
+    "schema_check",
+    "range_check",
+    "relationship_check",
+    "custom_sql",
+})
+
 
 def _to_run_out(r: models.Run) -> schemas.RunOut:
-    """Compose a RunOut from a Run row, folding error_reason + error_at_test into the nested error object."""
     err = None
     if r.error_reason:
         err = schemas.RunErrorDetail(reason=r.error_reason, at_test=r.error_at_test)
@@ -27,21 +41,122 @@ def _to_run_out(r: models.Run) -> schemas.RunOut:
     )
 
 
+def _compute_total_tests(profile: str, type_filter: list[str] | None, client_id: int, db: Session) -> int:
+    """Count enabled TestDefinitions for this client matching profile + type_filter.
+
+    Uses the DB (not YAML) as the source of truth for tests — the YAML is engine-side
+    and the dashboard_api owns its own test_definitions table. Engine config_loader will
+    reconcile at run time via the existing YAML/DB sync mechanism in engine startup.
+    """
+    q = (
+        db.query(models.TestDefinition)
+        .filter(
+            models.TestDefinition.client_id == client_id,
+            models.TestDefinition.enabled == True,  # noqa: E712 (SQLAlchemy comparison)
+            models.TestDefinition.profile == profile,
+        )
+    )
+    if type_filter:
+        q = q.filter(models.TestDefinition.type.in_(type_filter))
+    return q.count()
+
+
 @router.post("", response_model=schemas.RunTriggerOut, status_code=202)
 def trigger_run(
     body: schemas.RunCreate,
+    background_tasks: BackgroundTasks,
     client=Depends(get_current_client_jwt),
     db: Session = Depends(get_db),
 ):
-    """Trigger a new run. SKELETON — Wave 1 (plan 02-02) implements the actual trigger.
+    """Trigger a new data quality run for the authenticated client.
 
-    This skeleton validates the contract (auth + body shape) and returns 501 so the
-    frontend wire-up in plans 02-03/02-04 can be developed against a real auth-gated
-    endpoint while 02-02 lands in parallel.
+    Validates profile + type_filter, creates a Run row in QUEUED state, schedules
+    execute_run via FastAPI BackgroundTasks, and returns the run_id + total_tests
+    synchronously so the UI can immediately render the in-progress chrome.
+
+    Failure paths (D-14 Type-a — "didn't start"):
+    - Unknown profile -> 400 with `Couldn't start — profile {name} not found in database_connection.yaml`
+    - Invalid type_filter value -> 400 with `Couldn't start — unknown test type(s) {values}`
+    - Zero matching enabled tests -> 400 with `Couldn't start — no enabled tests for profile {name}`
+    - Active run exists -> 409 `A run is already in progress` (D-09 defense-in-depth)
     """
-    # Validate profile exists — full validation will be in 02-02 (against YAML)
-    # type_filter validation also in 02-02
-    raise HTTPException(status_code=501, detail="Run trigger not yet implemented — see plan 02-02")
+    # Validate profile against the YAML whitelist (security_constraints).
+    valid_names, _default = load_profile_names()
+    if not valid_names:
+        # Empty list could mean missing file OR parse error — either way, can't trigger.
+        raise HTTPException(
+            status_code=400,
+            detail="Couldn't start — engine config missing or unparseable (database_connection.yaml)",
+        )
+    if body.profile not in valid_names:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Couldn't start — profile {body.profile} not found in database_connection.yaml",
+        )
+
+    # Validate type_filter against the builtin whitelist (security_constraints).
+    if body.type_filter is not None:
+        unknown = [t for t in body.type_filter if t not in _ALLOWED_TYPE_FILTERS]
+        if unknown:
+            allowed = ", ".join(sorted(_ALLOWED_TYPE_FILTERS))
+            raise HTTPException(
+                status_code=400,
+                detail=f"Couldn't start — unknown test type(s) {unknown} — must be one of [{allowed}]",
+            )
+
+    # Pre-flight: compute total_tests against the DB. Zero -> reject (D-14 "no tests configured").
+    total = _compute_total_tests(body.profile, body.type_filter, client.id, db)
+    if total == 0:
+        filter_desc = f" with type_filter {body.type_filter}" if body.type_filter else ""
+        raise HTTPException(
+            status_code=400,
+            detail=f"Couldn't start — no enabled tests for profile {body.profile}{filter_desc}",
+        )
+
+    # Concurrency policy (D-09): the frontend dedupes triggers, but defend in depth.
+    # If this client already has an ACTIVE (QUEUED or RUNNING) run, reject with 409.
+    active = (
+        db.query(models.Run)
+        .filter(
+            models.Run.client_id == client.id,
+            models.Run.status.in_(["QUEUED", "RUNNING"]),
+        )
+        .first()
+    )
+    if active is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="A run is already in progress",
+        )
+
+    # Create the Run row.
+    run = models.Run(
+        client_id=client.id,
+        profile=body.profile,
+        type_filter=body.type_filter,
+        status="QUEUED",
+        total_tests=total,
+        completed_tests=0,
+    )
+    db.add(run)
+    db.commit()
+    db.refresh(run)
+
+    # Schedule the engine run. BackgroundTasks runs AFTER this response is sent
+    # (verified per FastAPI docs) so the response latency stays <100ms.
+    background_tasks.add_task(
+        execute_run,
+        run_id=run.id,
+        client_id=client.id,
+        profile=body.profile,
+        type_filter=body.type_filter,
+    )
+
+    return schemas.RunTriggerOut(
+        run_id=run.id,
+        total_tests=total,
+        status=run.status,
+    )
 
 
 @router.get("", response_model=list[schemas.RunOut])
