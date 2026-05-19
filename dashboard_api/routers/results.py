@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from dashboard_api import models, schemas
@@ -20,8 +20,22 @@ def submit_results(
     """
     Called by the backend engine after each test run.
     Accepts a batch of test results and stores them.
+    Phase 2: if batch.run_id is supplied, results are tagged with run_id and
+    the Run.completed_tests counter is incremented (D-06 fidelity).
     """
     run_at = datetime.utcnow()
+
+    # Phase 2: validate run_id belongs to this client (D-24). Reject if cross-client.
+    run = None
+    if batch.run_id is not None:
+        run = (
+            db.query(models.Run)
+            .filter(models.Run.id == batch.run_id, models.Run.client_id == client.id)
+            .first()
+        )
+        if run is None:
+            # 404 (not 403) — same disclosure-avoidance as GET /runs/{id}.
+            raise HTTPException(status_code=404, detail="Run not found")
 
     for r in batch.results:
         record = models.TestResult(
@@ -34,11 +48,15 @@ def submit_results(
             metrics=r.metrics,
             message=r.message,
             run_at=run_at,
+            run_id=batch.run_id,
         )
         db.add(record)
 
+    if run is not None:
+        run.completed_tests = run.completed_tests + len(batch.results)
+
     db.commit()
-    return {"stored": len(batch.results), "run_at": run_at.isoformat()}
+    return {"stored": len(batch.results), "run_at": run_at.isoformat(), "run_id": batch.run_id}
 
 
 @router.get("", response_model=list[schemas.TestResultOut])
