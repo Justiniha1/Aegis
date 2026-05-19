@@ -95,3 +95,42 @@ export const TYPE_PILL_COLORS: Record<string, string> = {
 };
 
 export const SIDEBAR_ACTIVE_BG = "#0B3A66";
+
+/* ── Phase 2 run-level status labels (D-20) ──────────────────────────── */
+/* Run lifecycle: QUEUED → RUNNING → COMPLETE | FAILED.
+   Label-map pattern matches STATUS_LABELS / SEVERITY_LABELS / TYPE_LABELS —
+   consumed by RunStatusBadge in TopBar progress pill and StatusFooter state copy. */
+export const RUN_STATUS_LABELS: Record<string, string> = {
+  QUEUED: "Queued",
+  RUNNING: "Running",
+  COMPLETE: "Complete",
+  FAILED: "Failed",
+};
+
+/* Run-status palette — reuses STATUS_PALETTE entries per D-19 (no new hexes).
+   Mapping rationale:
+     QUEUED   → SKIPPED neutral grey (waiting, not running)
+     RUNNING  → ERROR amber (in-flight, neither passed nor failed yet)
+     COMPLETE → PASSED green (successful terminal state)
+     FAILED   → FAILED red (error terminal state) */
+export const RUN_STATUS_PALETTE: Record<string, string> = {
+  QUEUED: STATUS_PALETTE.SKIPPED,
+  RUNNING: STATUS_PALETTE.ERROR,
+  COMPLETE: STATUS_PALETTE.PASSED,
+  FAILED: STATUS_PALETTE.FAILED,
+};
+
+/* ── Phase 2 per-result PENDING extension (D-20) ─────────────────────── */
+/* PENDING = test scheduled but not yet executed; pre-Phase-2 test rows
+   continue to use the existing four statuses (PASSED/FAILED/ERROR/SKIPPED).
+   PENDING-state row glyph is "⏳" — see RowRunTrigger in plan 02-04.
+   Color mapping reuses SKIPPED grey per D-19. */
+export const RESULT_STATUS_LABELS: Record<string, string> = {
+  ...STATUS_LABELS,
+  PENDING: "Pending",
+};
+
+export const RESULT_STATUS_PALETTE: Record<string, string> = {
+  ...STATUS_PALETTE,
+  PENDING: STATUS_PALETTE.SKIPPED,
+};
