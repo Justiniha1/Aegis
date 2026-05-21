@@ -1,0 +1,22 @@
+import typer
+
+app = typer.Typer(
+    name="aegis",
+    help="Aegis DQ — data quality from the command line.",
+    no_args_is_help=True,
+)
+
+from cli.commands.init import init_cmd
+from cli.commands.push import push_cmd
+from cli.commands.pull import pull_cmd
+from cli.commands.run_cmd import run_cmd
+from cli.commands.status import status_cmd
+
+app.command("init")(init_cmd)
+app.command("push")(push_cmd)
+app.command("pull")(pull_cmd)
+app.command("run")(run_cmd)
+app.command("status")(status_cmd)
+
+if __name__ == "__main__":
+    app()

@@ -1,0 +1,16 @@
+# Aegis test definitions
+# Edit this file and run 'aegis push' to sync changes to your dashboard.
+# Run 'aegis pull' to fetch the latest definitions from your dashboard.
+
+settings:
+  default_profile: production
+  default_severity: MEDIUM
+
+tests:
+  - name: Example Row Count Check
+    type: row_count
+    profile: production
+    severity: HIGH
+    enabled: true
+    table: your_table_name
+    min_rows: 1
