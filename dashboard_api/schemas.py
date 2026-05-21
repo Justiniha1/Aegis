@@ -153,3 +153,20 @@ class RunTriggerOut(BaseModel):
 class ProfileOut(BaseModel):
     name: str
     is_default: bool = False
+
+
+# ── Connection Profiles ───────────────────────────────────────────────────────
+
+class ConnectionProfileCreate(BaseModel):
+    name: str
+    connection_url: str    # plaintext — encrypted before storage, never returned
+    db_type: str
+
+
+class ConnectionProfileOut(BaseModel):
+    id: int
+    name: str
+    db_type: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
