@@ -85,13 +85,12 @@ def execute_run(
     This function is invoked by FastAPI BackgroundTasks AFTER POST /api/v1/runs returns.
     It never raises — all exceptions are converted to Run.FAILED with sanitized reason text.
     """
-    # Import here to keep module load fast and avoid cycle risk at api boot.
     from backend.core.config_loader import (
-        DQFConfig, load_config,
-        TestDefinition as EngineTestDef,
+        DQFConfig, EngineConfig, TestDefinition as EngineTestDef,
         _name_to_id, _deduplicate_test_ids,
     )
     from backend.core.test_engine import TestEngine
+    from dashboard_api.encryption import decrypt
 
     db = SessionLocal()
     try:
@@ -100,42 +99,40 @@ def execute_run(
             print(f"[warn] execute_run: run_id={run_id} not found — aborting")
             return
 
-        # Flip QUEUED -> RUNNING
         run.status = "RUNNING"
         db.commit()
 
-        try:
-            # Load engine config from YAML (same path the CLI engine uses).
-            # config_loader respects DQF_CONNECTION_YAML_PATH via CONFIG_DIR — set in compose env.
-            config = load_config()
-        except FileNotFoundError as e:
-            # D-14 Type-a "didn't start" — profile config missing.
+        # Load connection profile from DB (replaces local YAML lookup)
+        conn_row = db.query(models.ConnectionProfile).filter(
+            models.ConnectionProfile.client_id == client_id,
+            models.ConnectionProfile.name == profile,
+        ).first()
+
+        if conn_row is None:
             run.status = "FAILED"
             run.error_reason = _sanitize_error(
-                f"Engine config missing — {type(e).__name__}: {e}"
-            )
-            run.completed_at = datetime.utcnow()
-            db.commit()
-            return
-        except Exception as e:
-            # D-14 Type-a — couldn't even load config.
-            run.status = "FAILED"
-            run.error_reason = _sanitize_error(
-                f"Engine config load failed — {type(e).__name__}: {e}"
+                f"Profile '{profile}' not found — add it in Settings → Connection Profiles"
             )
             run.completed_at = datetime.utcnow()
             db.commit()
             return
 
-        # Validate the selected profile exists as a database connection.
-        if profile not in config.connections:
+        try:
+            connection_url = decrypt(conn_row.connection_url_encrypted)
+        except Exception as e:
             run.status = "FAILED"
-            run.error_reason = _sanitize_error(
-                f"Profile {profile} not reachable — not present in database_connection.yaml"
-            )
+            run.error_reason = _sanitize_error(f"Could not decrypt profile '{profile}': {e}")
             run.completed_at = datetime.utcnow()
             db.commit()
             return
+
+        connections = {profile: {"connection_url": connection_url}}
+        engine_cfg = EngineConfig(
+            engine="simple",
+            default_profile=profile,
+            default_severity="MEDIUM",
+            alerts={},
+        )
 
         # Load tests from DB filtered by profile — each profile is a distinct DB environment.
         db_tests_q = db.query(models.TestDefinition).filter(
@@ -157,7 +154,6 @@ def execute_run(
             db.commit()
             return
 
-        # Convert DB rows to engine TestDefinition objects (same as load_config_from_api).
         engine_tests = []
         for t in db_test_rows:
             raw = {
@@ -182,8 +178,8 @@ def execute_run(
         engine_tests = _deduplicate_test_ids(engine_tests)
 
         narrowed = DQFConfig(
-            engine=config.engine,
-            connections=config.connections,
+            engine=engine_cfg,
+            connections=connections,
             tests=engine_tests,
         )
 
