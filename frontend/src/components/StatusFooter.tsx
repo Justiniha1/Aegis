@@ -1,14 +1,20 @@
-import { NEUTRAL_SCALE, STATUS_PALETTE } from "@/lib/constants";
+import type { RunStatus } from "@/lib/types";
+import { NEUTRAL_SCALE, STATUS_PALETTE, RUN_STATUS_PALETTE } from "@/lib/constants";
 
-/* StatusFooter — static "Engine: idle" strip (D-05, UI-SPEC §"Status footer")
-   Pinned below the main content area.
-   Height: 32px. Background: surface-elevated. 1px top border.
-   Content: 6px neutral indicator dot + "Engine: idle" body text.
-   No pulse, no live-signal timestamp copy, no chromatic accent. */
+const ENGINE_STATES: Record<string, { label: string; color: string; pulse: boolean }> = {
+  QUEUED:   { label: "Engine: queued",   color: RUN_STATUS_PALETTE.QUEUED,   pulse: false },
+  RUNNING:  { label: "Engine: running",  color: RUN_STATUS_PALETTE.RUNNING,  pulse: true  },
+  COMPLETE: { label: "Engine: finished", color: STATUS_PALETTE.PASSED,       pulse: false },
+  FAILED:   { label: "Engine: failed",   color: STATUS_PALETTE.FAILED,       pulse: false },
+};
 
-export function StatusFooter({ dark }: { dark: boolean }) {
+export function StatusFooter({ dark, runStatus }: { dark: boolean; runStatus?: RunStatus | null }) {
   const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
-  const neutral = STATUS_PALETTE.SKIPPED;
+
+  const state = runStatus ? ENGINE_STATES[runStatus] : null;
+  const dotColor = state ? state.color : STATUS_PALETTE.SKIPPED;
+  const label    = state ? state.label : "Engine: idle";
+  const pulse    = state?.pulse ?? false;
 
   return (
     <footer
@@ -26,10 +32,12 @@ export function StatusFooter({ dark }: { dark: boolean }) {
             width: "6px",
             height: "6px",
             borderRadius: "9999px",
-            backgroundColor: neutral,
+            backgroundColor: dotColor,
+            animation: pulse ? "pulse 1.5s ease-in-out infinite" : "none",
+            transition: "background-color 300ms",
           }}
         />
-        Engine: idle
+        {label}
       </span>
     </footer>
   );

@@ -1,10 +1,12 @@
 "use client";
 
 import { useTheme } from "@/lib/theme";
+import { useRunContext } from "@/lib/run-context";
 import { NEUTRAL_SCALE, BRAND_TEAL, STATUS_PALETTE } from "@/lib/constants";
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
+  const { profiles, selectedProfile, setSelectedProfile } = useRunContext();
   const dark = theme === "dark";
   const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
 
@@ -24,6 +26,95 @@ export default function SettingsPage() {
           Customize your dashboard experience
         </p>
       </div>
+
+      {/* Active Environment */}
+      <section
+        className="p-6"
+        style={{
+          backgroundColor: palette.surfaceElevated,
+          border: `1px solid ${palette.borderSubtle}`,
+          borderRadius: "8px",
+        }}
+      >
+        <h2
+          className="text-heading mb-1"
+          style={{ color: palette.textPrimary }}
+        >
+          Active Environment
+        </h2>
+        <p
+          className="text-body mb-5"
+          style={{ color: palette.textSecondary }}
+        >
+          "Run all" runs tests tagged to this profile.
+        </p>
+
+        {profiles.length === 0 ? (
+          <p className="text-body" style={{ color: palette.textSecondary }}>
+            No environments found — check your database_connection.yaml.
+          </p>
+        ) : (
+          <div className="space-y-1">
+            {profiles.map((p) => {
+              const active = selectedProfile === p.name;
+              return (
+                <button
+                  key={p.name}
+                  type="button"
+                  onClick={() => setSelectedProfile(p.name)}
+                  className="w-full text-left flex items-center gap-3 px-3 py-2.5 transition-all"
+                  style={{
+                    borderRadius: "6px",
+                    backgroundColor: active ? `${BRAND_TEAL}0F` : "transparent",
+                    opacity: active ? 1 : 0.45,
+                    cursor: "pointer",
+                    border: "none",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!active) (e.currentTarget as HTMLButtonElement).style.opacity = "0.75";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!active) (e.currentTarget as HTMLButtonElement).style.opacity = "0.45";
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "7px",
+                      height: "7px",
+                      borderRadius: "9999px",
+                      backgroundColor: active ? BRAND_TEAL : palette.textSecondary,
+                      flexShrink: 0,
+                      transition: "background-color 120ms",
+                    }}
+                  />
+                  <span
+                    className="text-body"
+                    style={{
+                      fontFamily: "var(--font-jetbrains-mono)",
+                      color: active ? palette.textPrimary : palette.textSecondary,
+                      fontWeight: active ? 500 : 400,
+                    }}
+                  >
+                    {p.name}
+                  </span>
+                  {p.is_default && (
+                    <span
+                      className="text-[10px] px-1.5 py-0.5 rounded font-semibold"
+                      style={{
+                        backgroundColor: `${BRAND_TEAL}1A`,
+                        color: BRAND_TEAL,
+                        opacity: 1,
+                      }}
+                    >
+                      default
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       {/* Appearance */}
       <section

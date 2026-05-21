@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
+import { RunProvider, useRunContext } from "@/lib/run-context";
 import { TopBar } from "@/components/TopBar";
 import { StatusFooter } from "@/components/StatusFooter";
 import {
@@ -13,9 +14,6 @@ import {
   NEUTRAL_SCALE,
 } from "@/lib/constants";
 
-/* Two-group nav per D-06 / UI-SPEC §Sidebar.
-   Group "Monitor": Dashboard, History.
-   Group "Configure": Tests, Settings. */
 const NAV_GROUPS: { label: string; items: { href: string; label: string }[] }[] = [
   {
     label: "Monitor",
@@ -33,15 +31,20 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string }[] }[] 
   },
 ];
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <RunProvider>
+      <DashboardLayoutInner>{children}</DashboardLayoutInner>
+    </RunProvider>
+  );
+}
+
+function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { clientName, logout } = useAuth();
   const { theme, toggle } = useTheme();
+  const { runStatus, runError, isTriggering, trigger, passingCount, warningCount, selectedProfile } = useRunContext();
 
   const dark = theme === "dark";
   const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
@@ -51,8 +54,8 @@ export default function DashboardLayout({
     router.push("/login");
   };
 
-  /* h-screen on the OUTER container preserves the Phase 1 sidebar-scroll fix.
-     Sidebar nav uses overflow-y-auto so the sidebar footer stays reachable on short viewports. */
+  const isRunActive = runStatus === "QUEUED" || runStatus === "RUNNING";
+
   return (
     <div
       className="h-screen flex"
@@ -64,7 +67,6 @@ export default function DashboardLayout({
         className="w-56 flex flex-col"
         style={{ backgroundColor: BRAND_NAVY, borderRight: "none" }}
       >
-        {/* Logo: 32px teal square + white "Ae" in JetBrains Mono semibold 14px (D-09) */}
         <div className="px-5 py-6 flex items-center gap-3">
           <div
             className="flex items-center justify-center"
@@ -91,7 +93,6 @@ export default function DashboardLayout({
           </h1>
         </div>
 
-        {/* Nav groups */}
         <nav
           className="flex-1 px-3 py-4 space-y-6 overflow-y-auto"
           aria-label="Primary"
@@ -100,10 +101,7 @@ export default function DashboardLayout({
             <div key={group.label}>
               <p
                 className="px-3 mb-2 text-[11px] font-semibold uppercase"
-                style={{
-                  letterSpacing: "0.08em",
-                  color: "#8B95A8",
-                }}
+                style={{ letterSpacing: "0.08em", color: "#8B95A8" }}
               >
                 {group.label}
               </p>
@@ -131,7 +129,6 @@ export default function DashboardLayout({
           ))}
         </nav>
 
-        {/* Sidebar footer — client / theme toggle / sign out (Phase 1 carry-forward preserved) */}
         <div className="px-5 py-4" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
           <div className="flex items-center justify-between">
             <p
@@ -166,16 +163,20 @@ export default function DashboardLayout({
       {/* ── Main column: TopBar + scrollable content + StatusFooter ─────── */}
       <div className="flex-1 flex flex-col min-w-0">
         <TopBar
-          breadcrumb={{ client: clientName || "—", environment: "production" }}
-          passingCount={0}
-          warningCount={0}
+          breadcrumb={{ client: clientName || "—", environment: selectedProfile || "—" }}
+          passingCount={passingCount}
+          warningCount={warningCount}
           dark={dark}
           showNewTestButton={pathname !== "/dashboard/tests"}
+          onRun={trigger}
+          runStatus={runStatus}
+          runError={runError}
+          isRunning={isRunActive || isTriggering}
         />
         <main className="flex-1 overflow-auto p-8" style={{ backgroundColor: palette.surfaceBg }}>
           {children}
         </main>
-        <StatusFooter dark={dark} />
+        <StatusFooter dark={dark} runStatus={runStatus} />
       </div>
     </div>
   );

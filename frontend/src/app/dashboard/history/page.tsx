@@ -26,7 +26,7 @@ export default function HistoryPage() {
   const router = useRouter();
   const [results, setResults] = useState<TestResult[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedRun, setSelectedRun] = useState<string | null>(null);
+  const [selectedRun, setSelectedRun] = useState<number | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -38,25 +38,27 @@ export default function HistoryPage() {
   }, [token, authLoading, router]);
 
   const { runMap, runs } = useMemo(() => {
-    const map = new Map<string, TestResult[]>();
+    const map = new Map<number, TestResult[]>();
     for (const r of results) {
-      const existing = map.get(r.run_at) || [];
+      if (r.run_id == null) continue;
+      const existing = map.get(r.run_id) || [];
       existing.push(r);
-      map.set(r.run_at, existing);
+      map.set(r.run_id, existing);
     }
     const summaries: RunSummary[] = Array.from(map.entries())
-      .map(([run_at, items]) => ({
-        run_at,
+      .map(([run_id, items]) => ({
+        run_id,
+        run_at: items[0].run_at,
         total: items.length,
         passed: items.filter((i) => i.status === "PASSED").length,
         failed: items.filter((i) => i.status === "FAILED").length,
         errors: items.filter((i) => i.status === "ERROR").length,
       }))
-      .sort((a, b) => new Date(b.run_at).getTime() - new Date(a.run_at).getTime());
+      .sort((a, b) => b.run_id - a.run_id);
     return { runMap: map, runs: summaries };
   }, [results]);
 
-  const selectedResults = selectedRun ? runMap.get(selectedRun) || [] : [];
+  const selectedResults = selectedRun != null ? runMap.get(selectedRun) || [] : [];
 
   if (loading || authLoading) {
     return (
@@ -106,15 +108,15 @@ export default function HistoryPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-4 gap-6">
           {/* Runs list */}
           <div className="col-span-1 space-y-2">
             {runs.map((run) => {
-              const active = selectedRun === run.run_at;
+              const active = selectedRun === run.run_id;
               return (
                 <button
-                  key={run.run_at}
-                  onClick={() => setSelectedRun(run.run_at)}
+                  key={run.run_id}
+                  onClick={() => setSelectedRun(run.run_id)}
                   className="w-full text-left p-4 transition-colors"
                   style={{
                     backgroundColor: palette.surfaceElevated,
@@ -152,7 +154,7 @@ export default function HistoryPage() {
           </div>
 
           {/* Run detail */}
-          <div className="col-span-2">
+          <div className="col-span-3">
             {selectedRun ? (
               <div
                 className="overflow-hidden"
@@ -170,11 +172,11 @@ export default function HistoryPage() {
                     className="text-heading"
                     style={{ color: palette.textPrimary }}
                   >
-                    Run at <span style={{ fontFamily: "var(--font-jetbrains-mono)" }}>{new Date(selectedRun).toLocaleString()}</span>
+                    Run at <span style={{ fontFamily: "var(--font-jetbrains-mono)" }}>{selectedRun != null ? new Date(runs.find((r) => r.run_id === selectedRun)?.run_at ?? "").toLocaleString() : ""}</span>
                   </h2>
                   <div className="flex gap-4 mt-1 text-caption" style={{ textTransform: "none", letterSpacing: "0" }}>
                     {(() => {
-                      const run = runs.find((r) => r.run_at === selectedRun);
+                      const run = runs.find((r) => r.run_id === selectedRun);
                       if (!run) return null;
                       return (
                         <>
@@ -225,9 +227,8 @@ export default function HistoryPage() {
                         <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
                         <td className="px-4 py-3"><SeverityBadge severity={r.severity} /></td>
                         <td
-                          className="px-4 py-3 max-w-sm truncate text-body"
-                          style={{ color: palette.textSecondary }}
-                          title={r.message}
+                          className="px-4 py-3 text-body"
+                          style={{ color: palette.textSecondary, whiteSpace: "normal", wordBreak: "break-word" }}
                         >
                           {r.message}
                         </td>

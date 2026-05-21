@@ -20,6 +20,7 @@ def send_to_dashboard(
     results: list[dict],
     run_timestamp: str,
     run_id: int | None = None,
+    profile: str = "default",
 ) -> bool:
     """
     POST test results to the Dashboard API.
@@ -33,7 +34,7 @@ def send_to_dashboard(
     try:
         resp = requests.post(
             f"{_API_URL}/api/v1/results",
-            json=_sanitize({"results": results, "run_timestamp": run_timestamp, "run_id": run_id}),
+            json=_sanitize({"results": results, "run_timestamp": run_timestamp, "run_id": run_id, "run_profile": profile}),
             headers={"X-API-Key": _API_KEY},
             timeout=10,
         )

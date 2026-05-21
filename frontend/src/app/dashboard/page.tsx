@@ -14,6 +14,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { apiGet } from "@/lib/api";
+import { useRunContext } from "@/lib/run-context";
 import {
   SEVERITY_COLORS,
   TYPE_LABELS,
@@ -109,6 +110,7 @@ export default function DashboardPage() {
   const dark = theme === "dark";
   const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
   const router = useRouter();
+  const { lastCompleted } = useRunContext();
   const [results, setResults] = useState<TestResult[]>([]);
   const [testDefs, setTestDefs] = useState<TestDefinition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -134,7 +136,7 @@ export default function DashboardPage() {
       .then(([res, defs]) => { setResults(res); setTestDefs(defs); })
       .catch(() => router.push("/login"))
       .finally(() => setLoading(false));
-  }, [token, authLoading, router]);
+  }, [token, authLoading, router, lastCompleted]); // lastCompleted triggers re-fetch on run completion
 
   const derivedTableMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -167,8 +169,12 @@ export default function DashboardPage() {
 
   const latestResults = useMemo(() => {
     if (results.length === 0) return [];
-    const latestRun = results[0].run_at;
-    return results.filter((r) => r.run_at === latestRun);
+    const latestRunId = results[0].run_id;
+    if (latestRunId == null) {
+      const latestRun = results[0].run_at;
+      return results.filter((r) => r.run_at === latestRun);
+    }
+    return results.filter((r) => r.run_id === latestRunId);
   }, [results]);
 
   const chartResults = useMemo(() => {
@@ -189,6 +195,21 @@ export default function DashboardPage() {
     }
     return { total: latestResults.length, passed, failed, errors, skipped };
   }, [latestResults]);
+
+  const prevSummary = useMemo(() => {
+    // Find the second-distinct run_id in the results array (already sorted newest-first).
+    const latestId = results[0]?.run_id ?? null;
+    const prevId = results.find((r) => r.run_id !== latestId && r.run_id != null)?.run_id ?? null;
+    if (prevId == null) return null;
+    const prev = results.filter((r) => r.run_id === prevId);
+    let passed = 0, failed = 0, errors = 0;
+    for (const r of prev) {
+      if (r.status === "PASSED") passed++;
+      else if (r.status === "FAILED") failed++;
+      else if (r.status === "ERROR") errors++;
+    }
+    return { total: prev.length, passed, failed, errors };
+  }, [results]);
 
   const typeChartData = useMemo(() => {
     const groups: Record<string, TestResult[]> = {};
@@ -297,10 +318,10 @@ export default function DashboardPage() {
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* ── Metric cards: 4-up grid per UI-SPEC §"Metric cards" (D-05) ── */}
       <div className="grid grid-cols-4 gap-6">
-        <SummaryCard label="total tests" value={summary.total}  trend={0}                                    dark={dark} />
-        <SummaryCard label="passed"      value={summary.passed} trend={summary.passed > 0 ? 1 : 0}           dark={dark} />
-        <SummaryCard label="failed"      value={summary.failed} trend={summary.failed > 0 ? -1 : 0}          dark={dark} />
-        <SummaryCard label="errors"      value={summary.errors} trend={summary.errors > 0 ? -1 : 0}          dark={dark} />
+        <SummaryCard label="Total Tests" value={summary.total}  delta={prevSummary != null ? summary.total  - prevSummary.total  : null} dark={dark} />
+        <SummaryCard label="Passed"      value={summary.passed} delta={prevSummary != null ? summary.passed - prevSummary.passed : null} dark={dark} />
+        <SummaryCard label="Failed"      value={summary.failed} delta={prevSummary != null ? summary.failed - prevSummary.failed : null} deltaPositiveIsBad dark={dark} />
+        <SummaryCard label="Errors"      value={summary.errors} delta={prevSummary != null ? summary.errors - prevSummary.errors : null} deltaPositiveIsBad dark={dark} />
       </div>
 
       {/* ── Drill-down chart ───────────────────────────────────────────── */}
@@ -585,7 +606,7 @@ function EmptyChart({ statusFilter, dark }: { statusFilter: string; dark: boolea
       <p className="text-body" style={{ color: palette.textSecondary }}>
         {statusFilter === "issues"
           ? "No issues detected in the latest run"
-          : "Run your tests to see results here. Use the YAML editor or trigger a run from the CLI."}
+          : "Run your tests to see results here — click Run all to trigger a run."}
       </p>
     </div>
   );
@@ -621,21 +642,32 @@ function DetailList({
 function SummaryCard({
   label,
   value,
-  trend,
+  delta,
+  deltaPositiveIsBad = false,
   dark = true,
 }: {
   label: string;
   value: number;
-  trend?: -1 | 0 | 1;
+  delta?: number | null;
+  deltaPositiveIsBad?: boolean;
   dark?: boolean;
 }) {
   const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
-  const trendColor =
-    trend === 1 ? BRAND_TEAL :
-    trend === -1 ? "#EF4444" :
-    palette.textSecondary;
-  const trendGlyph =
-    trend === 1 ? "▲" : trend === -1 ? "▼" : "•";
+
+  let trendColor: string = palette.textSecondary;
+  let glyph = "•";
+  let trendLabel = "first run";
+
+  if (delta != null) {
+    if (delta === 0) {
+      trendLabel = "last run";
+    } else {
+      glyph = delta > 0 ? "▲" : "▼";
+      const isGood = delta > 0 ? !deltaPositiveIsBad : deltaPositiveIsBad;
+      trendColor = isGood ? BRAND_TEAL : "#EF4444";
+      trendLabel = delta > 0 ? `+${delta}` : `${delta}`;
+    }
+  }
 
   return (
     <div
@@ -646,30 +678,17 @@ function SummaryCard({
         borderRadius: "8px",
       }}
     >
-      <p
-        className="text-body"
-        style={{
-          color: palette.textSecondary,
-          textTransform: "lowercase",
-        }}
-      >
-        {label}
-      </p>
+      <p className="text-body" style={{ color: palette.textSecondary }}>{label}</p>
       <p
         className="mt-2 text-display"
-        style={{
-          fontFamily: "var(--font-jetbrains-mono)",
-          color: palette.textPrimary,
-        }}
+        style={{ fontFamily: "var(--font-jetbrains-mono)", color: palette.textPrimary }}
       >
         <AnimatedNumber value={value} />
       </p>
-      {typeof trend === "number" && (
-        <p className="mt-1 text-caption flex items-center gap-1" style={{ color: trendColor, textTransform: "none", letterSpacing: "0" }}>
-          <span style={{ fontSize: "10px" }}>{trendGlyph}</span>
-          <span style={{ fontFamily: "var(--font-jetbrains-mono)" }}>last run</span>
-        </p>
-      )}
+      <p className="mt-1 text-caption flex items-center gap-1" style={{ color: trendColor, textTransform: "none", letterSpacing: "0" }}>
+        <span style={{ fontSize: "10px" }}>{glyph}</span>
+        <span style={{ fontFamily: "var(--font-jetbrains-mono)" }}>{trendLabel}</span>
+      </p>
     </div>
   );
 }

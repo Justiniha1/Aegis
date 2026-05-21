@@ -22,6 +22,7 @@ class ResultsBatch(BaseModel):
     results: list[TestResultIn]
     run_timestamp: Optional[str] = None
     run_id: Optional[int] = None    # Phase 2 — set by UI-triggered runs via execute_run
+    run_profile: Optional[str] = None  # used when auto-creating a Run for make run path
 
 
 # ── Outbound — what the dashboard reads back ─────────────────────────────────
@@ -37,6 +38,7 @@ class TestResultOut(BaseModel):
     metrics: dict
     message: str
     run_at: datetime
+    run_id: Optional[int] = None
     # Enriched from TestDefinition.config at query time (not stored in TestResult)
     table: Optional[str] = None
     column: Optional[str] = None

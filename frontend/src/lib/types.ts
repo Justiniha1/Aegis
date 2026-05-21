@@ -8,6 +8,7 @@ export interface TestResult {
   metrics: Record<string, unknown>;
   message: string;
   run_at: string;
+  run_id: number | null;
   table: string | null;
   column: string | null;
 }
@@ -27,6 +28,7 @@ export interface TestDefinition {
 }
 
 export interface RunSummary {
+  run_id: number;
   run_at: string;
   total: number;
   passed: number;

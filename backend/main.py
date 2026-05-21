@@ -62,7 +62,7 @@ def main():
     results = engine.run()
     engine.print_summary(results)
     saved_path = engine.save_results(results)
-    send_to_dashboard(results, run_timestamp=saved_path.stem.replace("test_results_", ""))
+    send_to_dashboard(results, run_timestamp=saved_path.stem.replace("test_results_", ""), profile=config.engine.default_profile)
 
 
 if __name__ == "__main__":

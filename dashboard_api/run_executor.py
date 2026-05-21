@@ -14,6 +14,7 @@ Boundary contract:
   D-17-compliant error_reason. The function never raises.
 - run_id is threaded into result_handler so per-test results join cleanly.
 """
+import json
 import traceback
 from datetime import datetime
 from typing import Optional
@@ -22,6 +23,12 @@ from dashboard_api import models
 from dashboard_api.database import SessionLocal
 
 _MAX_ERROR_REASON_LEN = 500
+
+
+def _sanitize_metrics(metrics: dict) -> dict:
+    """Convert numpy/pandas scalar types to native Python before SQLAlchemy JSON serialization.
+    Custom SQL tests return np.int64/np.float64 values that SQLite's JSON column can't store."""
+    return json.loads(json.dumps(metrics, default=lambda x: x.item() if hasattr(x, "item") else str(x)))
 
 
 def _sanitize_error(s: str) -> str:
@@ -34,7 +41,7 @@ def _sanitize_error(s: str) -> str:
     return cleaned[:_MAX_ERROR_REASON_LEN]
 
 
-def _persist_result(db, client_id: int, run_id: int, result: dict) -> None:
+def _persist_result(db, client_id: int, run_id: int, result: dict, run_at: datetime) -> None:
     """Insert a single TestResult row and bump Run.completed_tests atomically.
 
     Fail-safe (D-23 spirit): any exception is swallowed so a per-test persist
@@ -50,9 +57,9 @@ def _persist_result(db, client_id: int, run_id: int, result: dict) -> None:
             test_type=result["type"],
             status=result["status"],
             severity=result["severity"],
-            metrics=result.get("metrics") or {},
+            metrics=_sanitize_metrics(result.get("metrics") or {}),
             message=result.get("message") or "",
-            run_at=datetime.utcnow(),
+            run_at=run_at,
         )
         db.add(row)
         run = db.query(models.Run).filter(models.Run.id == run_id).first()
@@ -79,7 +86,11 @@ def execute_run(
     It never raises — all exceptions are converted to Run.FAILED with sanitized reason text.
     """
     # Import here to keep module load fast and avoid cycle risk at api boot.
-    from backend.core.config_loader import DQFConfig, load_config
+    from backend.core.config_loader import (
+        DQFConfig, load_config,
+        TestDefinition as EngineTestDef,
+        _name_to_id, _deduplicate_test_ids,
+    )
     from backend.core.test_engine import TestEngine
 
     db = SessionLocal()
@@ -116,7 +127,7 @@ def execute_run(
             db.commit()
             return
 
-        # Validate profile reachable (in the loaded connections dict).
+        # Validate the selected profile exists as a database connection.
         if profile not in config.connections:
             run.status = "FAILED"
             run.error_reason = _sanitize_error(
@@ -126,41 +137,71 @@ def execute_run(
             db.commit()
             return
 
-        # Apply type_filter — narrow config.tests to those matching profile + filter.
-        filtered_tests = [
-            t for t in config.tests
-            if t.enabled and t.profile == profile
-            and (type_filter is None or t.type in type_filter)
-        ]
-        if not filtered_tests:
+        # Load tests from DB filtered by profile — each profile is a distinct DB environment.
+        db_tests_q = db.query(models.TestDefinition).filter(
+            models.TestDefinition.client_id == client_id,
+            models.TestDefinition.enabled == True,  # noqa: E712
+            models.TestDefinition.profile == profile,
+        )
+        if type_filter:
+            db_tests_q = db_tests_q.filter(models.TestDefinition.type.in_(type_filter))
+        db_test_rows = db_tests_q.order_by(models.TestDefinition.created_at.asc()).all()
+
+        if not db_test_rows:
             run.status = "FAILED"
             run.error_reason = _sanitize_error(
-                f"No tests enabled for profile {profile}"
+                f"No enabled tests for profile '{profile}'"
                 + (f" with type_filter {type_filter}" if type_filter else "")
             )
             run.completed_at = datetime.utcnow()
             db.commit()
             return
 
-        # Rebuild a narrowed DQFConfig.
+        # Convert DB rows to engine TestDefinition objects (same as load_config_from_api).
+        engine_tests = []
+        for t in db_test_rows:
+            raw = {
+                "name": t.name,
+                "type": t.type,
+                "severity": t.severity,
+                "profile": t.profile,
+                "enabled": t.enabled,
+                "tags": t.tags or [],
+                **(t.config or {}),
+            }
+            engine_tests.append(EngineTestDef(
+                name=t.name,
+                test_id=_name_to_id(t.name),
+                type=t.type,
+                profile=t.profile,
+                severity=t.severity,
+                enabled=t.enabled,
+                tags=t.tags or [],
+                raw=raw,
+            ))
+        engine_tests = _deduplicate_test_ids(engine_tests)
+
         narrowed = DQFConfig(
             engine=config.engine,
             connections=config.connections,
-            tests=filtered_tests,
+            tests=engine_tests,
         )
 
-        # Update total (it may differ from the value computed at POST time if YAML changed).
-        run.total_tests = len(filtered_tests)
+        run.total_tests = len(engine_tests)
         db.commit()
 
         engine = TestEngine(narrowed)
+
+        # Single timestamp shared by all results in this run — mirrors the batch path
+        # in results.py so the frontend can group them correctly by run_at.
+        run_at = datetime.utcnow()
 
         # Tracks which test we're at, for D-15 Type-b mid-run error reporting.
         state = {"idx": 0}
 
         def on_result(result: dict) -> None:
             state["idx"] += 1
-            _persist_result(db, client_id, run_id, result)
+            _persist_result(db, client_id, run_id, result, run_at)
 
         try:
             engine.run(on_result=on_result)

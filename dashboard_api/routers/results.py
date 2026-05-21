@@ -25,21 +25,34 @@ def submit_results(
     """
     run_at = datetime.utcnow()
 
-    # Phase 2: validate run_id belongs to this client (D-24). Reject if cross-client.
-    run = None
     if batch.run_id is not None:
+        # Validate run_id belongs to this client (D-24). Reject if cross-client.
         run = (
             db.query(models.Run)
             .filter(models.Run.id == batch.run_id, models.Run.client_id == client.id)
             .first()
         )
         if run is None:
-            # 404 (not 403) — same disclosure-avoidance as GET /runs/{id}.
             raise HTTPException(status_code=404, detail="Run not found")
+    else:
+        # make run path: auto-create a completed Run so results are grouped by run_id.
+        run = models.Run(
+            client_id=client.id,
+            profile=batch.run_profile or "default",
+            type_filter=None,
+            status="COMPLETE",
+            total_tests=len(batch.results),
+            completed_tests=len(batch.results),
+            started_at=run_at,
+            completed_at=run_at,
+        )
+        db.add(run)
+        db.flush()  # assigns run.id before inserting results
 
     for r in batch.results:
         record = models.TestResult(
             client_id=client.id,
+            run_id=run.id,
             test_id=r.test_id,
             test_name=r.name,
             test_type=r.type,
@@ -48,15 +61,14 @@ def submit_results(
             metrics=r.metrics,
             message=r.message,
             run_at=run_at,
-            run_id=batch.run_id,
         )
         db.add(record)
 
-    if run is not None:
+    if batch.run_id is not None:
         run.completed_tests = run.completed_tests + len(batch.results)
 
     db.commit()
-    return {"stored": len(batch.results), "run_at": run_at.isoformat(), "run_id": batch.run_id}
+    return {"stored": len(batch.results), "run_at": run_at.isoformat(), "run_id": run.id}
 
 
 @router.get("", response_model=list[schemas.TestResultOut])

@@ -1,13 +1,14 @@
+"use client";
+
 import Link from "next/link";
-import { BRAND_NAVY, STATUS_PALETTE, NEUTRAL_SCALE } from "@/lib/constants";
-
-/* TopBar — shared dashboard chrome (D-04, UI-SPEC §"Top bar")
-   Renders: breadcrumb (client / environment), inline pass/warning status badges,
-   spacer, disabled outlined "Run all" (D-08 — no tooltip text), primary navy "New test" CTA.
-   Height: 56px. Background: surface-elevated. 1px bottom border.
-
-   Per CONVENTIONS.md §"Module Design": `dark` and `showNewTestButton` threaded
-   explicitly — no useTheme()/usePathname() here. The layout owns route awareness. */
+import {
+  BRAND_NAVY,
+  STATUS_PALETTE,
+  NEUTRAL_SCALE,
+  RUN_STATUS_LABELS,
+  RUN_STATUS_PALETTE,
+} from "@/lib/constants";
+import type { RunStatus } from "@/lib/types";
 
 export function TopBar({
   breadcrumb,
@@ -15,16 +16,27 @@ export function TopBar({
   warningCount,
   dark,
   showNewTestButton,
+  onRun,
+  runStatus,
+  runError,
+  isRunning = false,
 }: {
   breadcrumb: { client: string; environment: string };
   passingCount: number;
   warningCount: number;
   dark: boolean;
   showNewTestButton: boolean;
+  onRun?: () => void;
+  runStatus?: RunStatus | null;
+  runError?: string | null;
+  isRunning?: boolean;
 }) {
   const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
   const passColor = STATUS_PALETTE.PASSED;
   const warnColor = STATUS_PALETTE.ERROR;
+
+  const runButtonDisabled = isRunning;
+  const statusPill = runStatus && (runStatus === "QUEUED" || runStatus === "RUNNING");
 
   return (
     <header
@@ -35,7 +47,7 @@ export function TopBar({
         borderBottom: `1px solid ${palette.borderSubtle}`,
       }}
     >
-      {/* ── Left: breadcrumb + inline status badges ── */}
+      {/* ── Left: breadcrumb + status badges (or run-status pill) ── */}
       <div className="flex items-center gap-4">
         <nav className="text-sm" style={{ color: palette.textSecondary }} aria-label="Breadcrumb">
           <span style={{ color: palette.textPrimary, fontWeight: 500 }}>{breadcrumb.client}</span>
@@ -44,50 +56,93 @@ export function TopBar({
         </nav>
 
         <div className="flex items-center gap-2">
-          <span
-            className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5"
-            style={{
-              backgroundColor: `${passColor}1A`,
-              color: passColor,
-              borderRadius: "4px",
-            }}
-          >
-            <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "9999px", backgroundColor: passColor }} />
-            {passingCount} passing
-          </span>
-          <span
-            className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5"
-            style={{
-              backgroundColor: `${warnColor}1A`,
-              color: warnColor,
-              borderRadius: "4px",
-            }}
-          >
-            <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "9999px", backgroundColor: warnColor }} />
-            {warningCount} warnings
-          </span>
+          {statusPill && runStatus ? (
+            /* In-progress run pill replaces the passing/warning badges */
+            <span
+              className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5"
+              style={{
+                backgroundColor: `${RUN_STATUS_PALETTE[runStatus]}1A`,
+                color: RUN_STATUS_PALETTE[runStatus],
+                borderRadius: "4px",
+              }}
+            >
+              <span
+                style={{
+                  display: "inline-block",
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "9999px",
+                  backgroundColor: RUN_STATUS_PALETTE[runStatus],
+                  animation: runStatus === "RUNNING" ? "pulse 1.5s ease-in-out infinite" : "none",
+                }}
+              />
+              {RUN_STATUS_LABELS[runStatus]}
+            </span>
+          ) : runError ? (
+            /* Error pill after a failed run */
+            <span
+              className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 max-w-xs truncate"
+              style={{
+                backgroundColor: `${STATUS_PALETTE.FAILED}1A`,
+                color: STATUS_PALETTE.FAILED,
+                borderRadius: "4px",
+              }}
+              title={runError}
+            >
+              Run failed — {runError}
+            </span>
+          ) : (
+            /* Normal passing / warning counts */
+            <>
+              <span
+                className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5"
+                style={{
+                  backgroundColor: `${passColor}1A`,
+                  color: passColor,
+                  borderRadius: "4px",
+                }}
+              >
+                <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "9999px", backgroundColor: passColor }} />
+                {passingCount} passing
+              </span>
+              <span
+                className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5"
+                style={{
+                  backgroundColor: `${warnColor}1A`,
+                  color: warnColor,
+                  borderRadius: "4px",
+                }}
+              >
+                <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "9999px", backgroundColor: warnColor }} />
+                {warningCount} warnings
+              </span>
+            </>
+          )}
         </div>
       </div>
 
-      {/* ── Right: disabled "Run all" + primary "New test" ── */}
+      {/* ── Right: "Run all" trigger + optional "New test" ── */}
       <div className="flex items-center gap-2">
         <button
           type="button"
-          disabled
-          aria-disabled="true"
+          onClick={() => !runButtonDisabled && onRun?.()}
+          disabled={runButtonDisabled}
+          aria-disabled={runButtonDisabled}
           className="text-sm font-medium px-3 py-1.5"
           style={{
             height: "36px",
-            border: `1px solid ${palette.borderSubtle}`,
-            color: palette.textSecondary,
+            border: `1px solid ${runButtonDisabled ? palette.borderSubtle : BRAND_NAVY}`,
+            color: runButtonDisabled ? palette.textSecondary : BRAND_NAVY,
             backgroundColor: "transparent",
             borderRadius: "8px",
-            opacity: 0.5,
-            cursor: "not-allowed",
+            opacity: runButtonDisabled ? 0.5 : 1,
+            cursor: runButtonDisabled ? "not-allowed" : "pointer",
+            transition: "opacity 150ms",
           }}
         >
-          Run all
+          {isRunning ? RUN_STATUS_LABELS[runStatus ?? "QUEUED"] ?? "Running…" : "Run all"}
         </button>
+
         {showNewTestButton && (
           <Link
             href="/dashboard/tests"

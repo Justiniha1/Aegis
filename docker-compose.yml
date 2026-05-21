@@ -9,7 +9,7 @@ services:
       - "8000:8000"
     volumes:
       - ./db_data:/app/db_data
-      - ./backend/config:/app/backend/config:ro
+      - ./backend/config:/app/backend/config
       - ./data:/app/data:ro
     environment:
       DATABASE_URL: sqlite:////app/db_data/dashboard.db

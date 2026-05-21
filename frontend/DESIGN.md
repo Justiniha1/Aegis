@@ -52,7 +52,7 @@ Scale — 4 sizes, 2 weights, uniform across pages (utility classes declared in 
 | Heading | `.text-heading` | 20px | 600 | 1.3 | Page titles, card titles, section headers |
 | Display | `.text-display` | 28px | 600 | 1.2 | Metric hero numbers (JetBrains Mono), login brand line |
 
-Metric-card labels: `.text-body` weight 400, `text-transform: lowercase`, `textSecondary`.
+Metric-card labels: `.text-body` weight 400, `textSecondary` — render label text as written (Title Case e.g. "Total Tests" / "Passed" / "Failed" / "Errors"; do not force `text-transform`).
 
 When a cell needs caption *sizing* but not its case/letter-spacing (e.g., mono identifier cells, descriptions, error spans), apply `.text-caption` then override `textTransform: "none"` + `letterSpacing: "0"` inline. Pattern repeats across all five page restyles.
 

@@ -42,12 +42,7 @@ def _to_run_out(r: models.Run) -> schemas.RunOut:
 
 
 def _compute_total_tests(profile: str, type_filter: list[str] | None, client_id: int, db: Session) -> int:
-    """Count enabled TestDefinitions for this client matching profile + type_filter.
-
-    Uses the DB (not YAML) as the source of truth for tests — the YAML is engine-side
-    and the dashboard_api owns its own test_definitions table. Engine config_loader will
-    reconcile at run time via the existing YAML/DB sync mechanism in engine startup.
-    """
+    """Count enabled TestDefinitions for this client matching profile + optional type_filter."""
     q = (
         db.query(models.TestDefinition)
         .filter(
@@ -110,7 +105,7 @@ def trigger_run(
         filter_desc = f" with type_filter {body.type_filter}" if body.type_filter else ""
         raise HTTPException(
             status_code=400,
-            detail=f"Couldn't start — no enabled tests for profile {body.profile}{filter_desc}",
+            detail=f"Couldn't start — no enabled tests for profile '{body.profile}'{filter_desc}",
         )
 
     # Concurrency policy (D-09): the frontend dedupes triggers, but defend in depth.
