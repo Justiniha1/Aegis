@@ -190,7 +190,10 @@ def execute_run(
             tests=engine_tests,
         )
 
-        run.total_tests = len(engine_tests)
+        if run.status == "QUEUED" or run.total_tests == 0:
+            run.total_tests = len(engine_tests)
+        elif run.total_tests != len(engine_tests):
+            print(f"[warn] run_id={run_id} test count changed ({run.total_tests} -> {len(engine_tests)}) after RUNNING — keeping original")
         db.commit()
 
         engine = TestEngine(narrowed)
