@@ -1,10 +1,9 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from dashboard_api import models, schemas
-from dashboard_api.auth import get_current_client_jwt
+from dashboard_api.auth import get_client_any_auth
 from dashboard_api.database import get_db
-from dashboard_api.profile_loader import load_profile_names
 from dashboard_api.run_executor import execute_run
 
 router = APIRouter(prefix="/api/v1/runs", tags=["runs"])
@@ -60,7 +59,7 @@ def _compute_total_tests(profile: str, type_filter: list[str] | None, client_id:
 def trigger_run(
     body: schemas.RunCreate,
     background_tasks: BackgroundTasks,
-    client=Depends(get_current_client_jwt),
+    client=Depends(get_client_any_auth),
     db: Session = Depends(get_db),
 ):
     """Trigger a new data quality run for the authenticated client.
@@ -70,23 +69,24 @@ def trigger_run(
     synchronously so the UI can immediately render the in-progress chrome.
 
     Failure paths (D-14 Type-a — "didn't start"):
-    - Unknown profile -> 400 with `Couldn't start — profile {name} not found in database_connection.yaml`
+    - Unknown profile -> 400 with `Couldn't start — profile {name} not found`
     - Invalid type_filter value -> 400 with `Couldn't start — unknown test type(s) {values}`
     - Zero matching enabled tests -> 400 with `Couldn't start — no enabled tests for profile {name}`
     - Active run exists -> 409 `A run is already in progress` (D-09 defense-in-depth)
     """
-    # Validate profile against the YAML whitelist (security_constraints).
-    valid_names, _default = load_profile_names()
-    if not valid_names:
-        # Empty list could mean missing file OR parse error — either way, can't trigger.
-        raise HTTPException(
-            status_code=400,
-            detail="Couldn't start — engine config missing or unparseable (database_connection.yaml)",
+    # Validate profile against DB-backed connection profiles.
+    profile_exists = (
+        db.query(models.ConnectionProfile)
+        .filter(
+            models.ConnectionProfile.client_id == client.id,
+            models.ConnectionProfile.name == body.profile,
         )
-    if body.profile not in valid_names:
+        .first()
+    )
+    if not profile_exists:
         raise HTTPException(
             status_code=400,
-            detail=f"Couldn't start — profile {body.profile} not found in database_connection.yaml",
+            detail=f"Couldn't start — profile '{body.profile}' not found. Add it in Settings → Connection Profiles",
         )
 
     # Validate type_filter against the builtin whitelist (security_constraints).
@@ -156,13 +156,11 @@ def trigger_run(
 
 @router.get("", response_model=list[schemas.RunOut])
 def list_runs(
-    limit: int = 50,
-    client=Depends(get_current_client_jwt),
+    limit: int = Query(50, ge=1, le=200),
+    client=Depends(get_client_any_auth),
     db: Session = Depends(get_db),
 ):
     """Return recent runs for the authenticated client, newest first. Scoped by client_id (D-24)."""
-    if limit > 200:
-        limit = 200
     rows = (
         db.query(models.Run)
         .filter(models.Run.client_id == client.id)
@@ -176,7 +174,7 @@ def list_runs(
 @router.get("/{run_id}", response_model=schemas.RunOut)
 def get_run(
     run_id: int,
-    client=Depends(get_current_client_jwt),
+    client=Depends(get_client_any_auth),
     db: Session = Depends(get_db),
 ):
     """Return a single run by id. 404 on cross-client access (per security_constraints — never 403)."""
