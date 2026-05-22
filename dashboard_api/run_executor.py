@@ -15,7 +15,9 @@ Boundary contract:
 - run_id is threaded into result_handler so per-test results join cleanly.
 """
 import json
+import re
 import traceback
+import unicodedata
 from datetime import datetime
 from typing import Optional
 
@@ -32,13 +34,18 @@ def _sanitize_metrics(metrics: dict) -> dict:
 
 
 def _sanitize_error(s: str) -> str:
-    """D-17 specificity + log-injection guard: strip CR/LF/control chars, cap length."""
+    """D-17 specificity + log-injection guard: strip control/format chars, cap length."""
     if not s:
         return ""
-    cleaned = s.replace("\r", " ").replace("\n", " ")
-    # Strip ASCII control chars 0x00-0x1F except space
-    cleaned = "".join(c for c in cleaned if ord(c) >= 32 or c == " ")
-    return cleaned[:_MAX_ERROR_REASON_LEN]
+    # Collapse all newline/tab variants to a single space
+    cleaned = s.translate(str.maketrans("\r\n\t\x0b\x0c", "     "))
+    # Strip all Unicode control (Cc) and format (Cf) category chars, preserving space
+    cleaned = "".join(
+        c for c in cleaned
+        if unicodedata.category(c) not in ("Cc", "Cf", "Cs") or c == " "
+    )
+    cleaned = re.sub(r" {2,}", " ", cleaned).strip()
+    return (cleaned or "[error message contained only non-printable characters]")[:_MAX_ERROR_REASON_LEN]
 
 
 def _persist_result(db, client_id: int, run_id: int, result: dict, run_at: datetime) -> None:
