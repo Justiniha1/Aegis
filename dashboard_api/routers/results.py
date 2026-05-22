@@ -10,6 +10,12 @@ from dashboard_api.database import get_db
 
 router = APIRouter(prefix="/api/v1/results", tags=["results"])
 
+_ALLOWED_STATUSES = frozenset({"PASSED", "FAILED", "ERROR", "SKIPPED"})
+_ALLOWED_TYPES = frozenset({
+    "null_check", "duplicate_check", "unique_check", "row_count",
+    "schema_check", "range_check", "relationship_check", "custom_sql",
+})
+
 
 @router.post("", status_code=201)
 def submit_results(
@@ -84,6 +90,11 @@ def get_results(
     Accepts API key or JWT. Results are ordered newest first.
     Enriches each result with table/column from the matching TestDefinition config.
     """
+    if status and status.upper() not in _ALLOWED_STATUSES:
+        raise HTTPException(status_code=400, detail=f"Unknown status: {status!r}")
+    if test_type and test_type not in _ALLOWED_TYPES:
+        raise HTTPException(status_code=400, detail=f"Unknown test_type: {test_type!r}")
+
     q = db.query(models.TestResult).filter(models.TestResult.client_id == client.id)
 
     if status:
