@@ -29,6 +29,7 @@ def test_load_config_raises_when_no_config_yaml(tmp_path, monkeypatch):
 def test_load_config_raises_when_no_api_key(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("AEGIS_API_KEY", raising=False)
+    monkeypatch.setattr("cli.config.load_dotenv", lambda: None)  # prevent project .env from re-setting the key
 
     aegis_dir = tmp_path / "aegis"
     aegis_dir.mkdir()
