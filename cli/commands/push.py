@@ -17,7 +17,12 @@ def push_cmd():
 
     try:
         result = client.post("/api/v1/tests/sync", json={"yaml_content": yaml_content})
-        typer.echo(f"[aegis] Pushed. Synced {result.get('synced', '?')} test(s) to dashboard.")
+        typer.echo(
+            f"[aegis] Pushed. created={result.get('created',0)} "
+            f"updated={result.get('updated',0)} "
+            f"deleted={result.get('deleted',0)} "
+            f"unchanged={result.get('unchanged',0)}"
+        )
     except Exception as e:
         typer.echo(f"[aegis] Push failed: {e}")
         raise typer.Exit(1)

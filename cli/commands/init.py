@@ -30,6 +30,6 @@ def init_cmd():
 
     typer.echo("[aegis] Project initialized. Next steps:")
     typer.echo("  1. Add AEGIS_API_KEY to .env")
-    typer.echo("  2. Add your DB connection in the dashboard under Settings → Connection Profiles")
+    typer.echo("  2. Add your DB connection in the dashboard under Settings -> Connection Profiles")
     typer.echo("  3. Edit aegis/test_definitions.yaml")
     typer.echo("  4. Run 'aegis push' to sync your tests to the dashboard")
