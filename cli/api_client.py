@@ -4,7 +4,7 @@ import requests
 class AegisClient:
     def __init__(self, api_url: str, api_key: str):
         self._base = api_url.rstrip("/")
-        self._headers = {"Authorization": f"Bearer {api_key}"}
+        self._headers = {"X-Api-Key": api_key}
 
     def get(self, path: str, **kwargs) -> dict:
         resp = requests.get(f"{self._base}{path}", headers=self._headers, timeout=15, **kwargs)
