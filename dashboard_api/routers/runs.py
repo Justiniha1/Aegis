@@ -94,9 +94,10 @@ def trigger_run(
         unknown = [t for t in body.type_filter if t not in _ALLOWED_TYPE_FILTERS]
         if unknown:
             allowed = ", ".join(sorted(_ALLOWED_TYPE_FILTERS))
+            unknown_display = [t[:64] for t in unknown[:5]]
             raise HTTPException(
                 status_code=400,
-                detail=f"Couldn't start — unknown test type(s) {unknown} — must be one of [{allowed}]",
+                detail=f"Couldn't start — unknown test type(s) {unknown_display} — must be one of [{allowed}]",
             )
 
     # Pre-flight: compute total_tests against the DB. Zero -> reject (D-14 "no tests configured").

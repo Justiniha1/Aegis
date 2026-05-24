@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 Status = Literal["PASSED", "FAILED", "ERROR", "SKIPPED"]
 Severity = Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
@@ -118,7 +118,7 @@ RunStatus = Literal["QUEUED", "RUNNING", "COMPLETE", "FAILED"]
 
 
 class RunCreate(BaseModel):
-    profile: str
+    profile: str = Field(..., max_length=128)
     type_filter: Optional[list[str]] = None   # None = "all enabled tests"
 
 
