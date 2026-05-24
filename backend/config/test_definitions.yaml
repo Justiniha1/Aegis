@@ -237,9 +237,3 @@ tests:
 
     '
   assertion: avg_order_value >= 50
-- name: Dupe Test
-  type: custom_sql
-  severity: MEDIUM
-  query: "SELECT COUNT(*) as orphaned_orders\nFROM orders o\nLEFT JOIN order_items\
-    \ oi ON o.order_id = oi.order_id\nWHERE o.status = 'completed'\n  AND oi.order_item_id\
-    \ IS NULL"
