@@ -66,6 +66,8 @@ export interface RunTriggerResponse {
 }
 
 export interface ProfileOut {
+  id: number;
   name: string;
-  is_default: boolean;
+  db_type: string;
+  created_at: string;
 }

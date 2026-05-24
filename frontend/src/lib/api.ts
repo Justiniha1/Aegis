@@ -68,3 +68,14 @@ export async function listRuns(limit: number, token: string): Promise<Run[]> {
 export async function listProfiles(token: string): Promise<ProfileOut[]> {
   return apiGet("/api/v1/profiles", token) as Promise<ProfileOut[]>;
 }
+
+export async function createProfile(
+  body: { name: string; connection_url: string; db_type: string },
+  token: string,
+): Promise<ProfileOut> {
+  return apiPost("/api/v1/profiles", body, token) as Promise<ProfileOut>;
+}
+
+export async function deleteProfile(id: number, token: string): Promise<void> {
+  await apiDelete(`/api/v1/profiles/${id}`, token);
+}

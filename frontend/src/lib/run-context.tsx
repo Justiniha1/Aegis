@@ -11,6 +11,7 @@ type RunCtx = {
   profiles: ProfileOut[];
   selectedProfile: string | null;
   setSelectedProfile: (name: string) => void;
+  refreshProfiles: () => void;
   runId: number | null;
   runStatus: RunStatus | null;
   runError: string | null;
@@ -45,17 +46,19 @@ export function RunProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== "undefined") localStorage.setItem(PROFILE_STORAGE_KEY, name);
   }, []);
 
-  useEffect(() => {
+  const loadProfiles = useCallback(() => {
     if (!token) return;
     listProfiles(token).then((p) => {
       setProfiles(p);
-      // Default to the default profile if nothing stored yet
       if (!localStorage.getItem(PROFILE_STORAGE_KEY) && p.length > 0) {
-        const def = p.find((x) => x.is_default) ?? p[0];
-        setSelectedProfile(def.name);
+        setSelectedProfile(p[0].name);
       }
     }).catch(() => {});
   }, [token, setSelectedProfile]);
+
+  useEffect(() => {
+    loadProfiles();
+  }, [loadProfiles]);
 
   // Fetch latest run counts for TopBar badges. Re-runs on initial load and after each run completes.
   useEffect(() => {
@@ -113,7 +116,7 @@ export function RunProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <RunContext.Provider
-      value={{ profiles, selectedProfile, setSelectedProfile, runId, runStatus, runError, isTriggering, trigger, lastCompleted, passingCount, warningCount }}
+      value={{ profiles, selectedProfile, setSelectedProfile, refreshProfiles: loadProfiles, runId, runStatus, runError, isTriggering, trigger, lastCompleted, passingCount, warningCount }}
     >
       {children}
     </RunContext.Provider>
