@@ -7,7 +7,6 @@ Credentials resolution order (for both api_url and api_key):
 """
 from __future__ import annotations
 
-import os
 from typing import Any, Sequence
 
 from airflow.models import BaseOperator
