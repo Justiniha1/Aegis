@@ -1,0 +1,13 @@
+# Aegis connection profiles
+# Edit this file and run 'aegis push' to sync profiles to your dashboard.
+#
+# Each profile needs a connection_url in SQLAlchemy URL format:
+#   SQLite:     sqlite:////absolute/path/to/database.db
+#   PostgreSQL: postgresql://user:password@host:5432/dbname
+#   MySQL:      mysql+pymysql://user:password@host:3306/dbname
+#
+# For SQLite inside Docker, use the container-side absolute path.
+
+dev:
+  type: sqlite
+  connection_url: sqlite:////app/data/raw/sample_ecommerce.db

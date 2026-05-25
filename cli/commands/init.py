@@ -19,6 +19,7 @@ def init_cmd():
 
     shutil.copy(TEMPLATES_DIR / "config.yaml", aegis_dir / "config.yaml")
     shutil.copy(TEMPLATES_DIR / "test_definitions.yaml", aegis_dir / "test_definitions.yaml")
+    shutil.copy(TEMPLATES_DIR / "database_connection.yaml", aegis_dir / "database_connection.yaml")
 
     (profiles_dir / "dev.yaml").write_text("# Dev profile label — add connection in dashboard Settings\nname: dev\n")
     (profiles_dir / "production.yaml").write_text("# Production profile label — add connection in dashboard Settings\nname: production\n")
@@ -30,6 +31,6 @@ def init_cmd():
 
     typer.echo("[aegis] Project initialized. Next steps:")
     typer.echo("  1. Add AEGIS_API_KEY to .env")
-    typer.echo("  2. Add your DB connection in the dashboard under Settings -> Connection Profiles")
-    typer.echo("  3. Edit aegis/test_definitions.yaml")
-    typer.echo("  4. Run 'aegis push' to sync your tests to the dashboard")
+    typer.echo("  2. Edit aegis/database_connection.yaml with your connection URLs")
+    typer.echo("  3. Edit aegis/test_definitions.yaml with your tests")
+    typer.echo("  4. Run 'aegis push' to sync tests and profiles to the dashboard")
