@@ -4,6 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
+import {
+  BRAND_NAVY,
+  BRAND_TEAL,
+  NEUTRAL_SCALE,
+  STATUS_PALETTE,
+} from "@/lib/constants";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -13,6 +19,7 @@ export default function LoginPage() {
   const { login } = useAuth();
   const { theme } = useTheme();
   const dark = theme === "dark";
+  const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -23,63 +30,150 @@ export default function LoginPage() {
       await login(email, password);
       router.push("/dashboard");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      const raw = err instanceof Error ? err.message : "";
+      const isNetwork = /network|fetch|reach|connect|abort|failed to fetch/i.test(raw);
+      setError(
+        isNetwork
+          ? "Can't reach the server. Try again, or check that the API is running."
+          : "Sign-in failed — check your email and password and try again."
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const inputCls = `w-full px-3 py-2 rounded-lg border focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 ${
-    dark
-      ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-      : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-  }`;
-
   return (
-    <div className={`min-h-screen flex items-center justify-center ${dark ? "bg-gray-950" : "bg-gray-50"}`}>
-      <div className="w-full max-w-sm">
-        <div className={`rounded-xl border p-8 shadow-xl ${dark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"}`}>
-          <h1 className={`text-2xl font-bold mb-1 ${dark ? "text-white" : "text-gray-900"}`}>Aegis</h1>
-          <p className={`mb-8 text-sm ${dark ? "text-gray-400" : "text-gray-500"}`}>
+    <div
+      className="min-h-screen flex items-center justify-center px-4"
+      style={{ backgroundColor: palette.surfaceBg }}
+    >
+      <div style={{ width: "100%", maxWidth: "360px" }}>
+        <div
+          style={{
+            backgroundColor: palette.surfaceElevated,
+            border: `1px solid ${palette.borderSubtle}`,
+            borderRadius: "8px",
+            padding: "32px",
+          }}
+        >
+          {/* Brand: 32px teal monogram + Aegis wordmark */}
+          <div className="flex items-center gap-3 mb-6">
+            <div
+              className="flex items-center justify-center"
+              style={{
+                width: "32px",
+                height: "32px",
+                backgroundColor: BRAND_TEAL,
+                borderRadius: "6px",
+                fontFamily: "var(--font-jetbrains-mono)",
+                fontSize: "14px",
+                fontWeight: 600,
+                color: "#FFFFFF",
+                lineHeight: 1,
+              }}
+              aria-label="Aegis"
+            >
+              Ae
+            </div>
+            <h1
+              className="text-display"
+              style={{
+                color: palette.textPrimary,
+                letterSpacing: "-0.01em",
+              }}
+            >
+              Aegis
+            </h1>
+          </div>
+
+          <p
+            className="mb-6 text-body"
+            style={{
+              fontFamily: "var(--font-jetbrains-mono)",
+              color: palette.textSecondary,
+            }}
+          >
             Sign in to your data quality dashboard
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className={`block text-sm mb-1 ${dark ? "text-gray-300" : "text-gray-700"}`}>Email</label>
+              <label
+                className="block text-caption mb-1"
+                style={{ color: palette.textSecondary, textTransform: "none", letterSpacing: "0", fontWeight: 500 }}
+              >
+                Email
+              </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className={inputCls}
                 placeholder="you@company.com"
+                className="w-full px-3 text-body focus:outline-none"
+                style={{
+                  height: "36px",
+                  backgroundColor: palette.surfaceBg,
+                  color: palette.textPrimary,
+                  border: `1px solid ${palette.borderSubtle}`,
+                  borderRadius: "8px",
+                }}
               />
             </div>
             <div>
-              <label className={`block text-sm mb-1 ${dark ? "text-gray-300" : "text-gray-700"}`}>Password</label>
+              <label
+                className="block text-caption mb-1"
+                style={{ color: palette.textSecondary, textTransform: "none", letterSpacing: "0", fontWeight: 500 }}
+              >
+                Password
+              </label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className={inputCls}
                 placeholder="Enter your password"
+                className="w-full px-3 text-body focus:outline-none"
+                style={{
+                  height: "36px",
+                  backgroundColor: palette.surfaceBg,
+                  color: palette.textPrimary,
+                  border: `1px solid ${palette.borderSubtle}`,
+                  borderRadius: "8px",
+                }}
               />
             </div>
 
             {error && (
-              <p className={`text-sm px-3 py-2 rounded-lg ${
-                dark ? "text-red-500 bg-red-500/10" : "text-red-700 bg-red-50"
-              }`}>{error}</p>
+              <p
+                className="text-body px-3 py-2"
+                style={{
+                  color: STATUS_PALETTE.FAILED,
+                  backgroundColor: `${STATUS_PALETTE.FAILED}1A`,
+                  border: `1px solid ${STATUS_PALETTE.FAILED}33`,
+                  borderRadius: "8px",
+                }}
+                role="alert"
+              >
+                {error}
+              </p>
             )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:text-gray-400 text-white rounded-lg font-medium transition-colors"
+              className="w-full text-body font-medium transition-colors"
+              style={{
+                height: "36px",
+                backgroundColor: BRAND_NAVY,
+                color: "#FFFFFF",
+                border: "none",
+                borderRadius: "8px",
+                cursor: loading ? "not-allowed" : "pointer",
+                opacity: loading ? 0.5 : 1,
+              }}
             >
-              {loading ? "Signing in..." : "Sign in"}
+              {loading ? "Signing in…" : "Sign in"}
             </button>
           </form>
         </div>

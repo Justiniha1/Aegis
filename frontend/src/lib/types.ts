@@ -8,6 +8,7 @@ export interface TestResult {
   metrics: Record<string, unknown>;
   message: string;
   run_at: string;
+  run_id: number | null;
   table: string | null;
   column: string | null;
 }
@@ -27,9 +28,46 @@ export interface TestDefinition {
 }
 
 export interface RunSummary {
+  run_id: number;
   run_at: string;
   total: number;
   passed: number;
   failed: number;
   errors: number;
+}
+
+/* ── Phase 2 — Run lifecycle types ──────────────────────────────────── */
+
+export type RunStatus = "QUEUED" | "RUNNING" | "COMPLETE" | "FAILED";
+export type ResultStatus = "PASSED" | "FAILED" | "ERROR" | "SKIPPED" | "PENDING";
+
+export interface RunErrorDetail {
+  reason: string;
+  at_test?: number | null;
+}
+
+export interface Run {
+  id: number;
+  client_id: number;
+  profile: string;
+  type_filter: string[] | null;
+  status: RunStatus;
+  total_tests: number;
+  completed_tests: number;
+  started_at: string;       // ISO timestamp
+  completed_at: string | null;
+  error: RunErrorDetail | null;
+}
+
+export interface RunTriggerResponse {
+  run_id: number;
+  total_tests: number;
+  status: RunStatus;
+}
+
+export interface ProfileOut {
+  id: number;
+  name: string;
+  db_type: string;
+  created_at: string;
 }

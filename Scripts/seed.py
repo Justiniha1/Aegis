@@ -22,6 +22,9 @@ import time
 import subprocess
 from pathlib import Path
 
+# Ensure emoji output works on Windows terminals that default to cp1252
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 # Ensure project root is importable
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))

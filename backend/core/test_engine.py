@@ -32,7 +32,13 @@ class TestEngine:
             )
         return self._connectors[profile_name]
 
-    def run(self) -> list[dict]:
+    def run(self, on_result=None) -> list[dict]:
+        """
+        Execute all enabled tests and return their result dicts.
+        If `on_result` is supplied, it is called with each result dict immediately after
+        the test completes. Exceptions inside the callback are caught and logged so a
+        callback bug never kills subsequent tests (per D-23 fail-safe philosophy).
+        """
         results = []
         enabled = [t for t in self.config.tests if t.enabled]
         total = len(enabled)
@@ -42,6 +48,11 @@ class TestEngine:
             label = f"[{i}/{total}] {test_def.name}"
             result = self._run_one(test_def, label)
             results.append(result)
+            if on_result is not None:
+                try:
+                    on_result(result)
+                except Exception as e:
+                    print(f"[warn] on_result callback raised — continuing: {e}")
 
         return results
 

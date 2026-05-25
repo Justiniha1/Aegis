@@ -10,26 +10,41 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
-  PieChart,
-  Pie,
 } from "recharts";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { apiGet } from "@/lib/api";
-import { SEVERITY_COLORS, TYPE_LABELS, SEVERITY_LABELS, formatConfigKey } from "@/lib/constants";
-import { StatusBadge, SeverityBadge } from "@/components/StatusBadge";
+import { useRunContext } from "@/lib/run-context";
+import {
+  SEVERITY_COLORS,
+  TYPE_LABELS,
+  SEVERITY_LABELS,
+  formatConfigKey,
+  BRAND_TEAL,
+  STATUS_PALETTE,
+  NEUTRAL_SCALE,
+} from "@/lib/constants";
+import {
+  StatusBadge,
+  SeverityBadge,
+  TypePill,
+  StatusDot,
+} from "@/components/StatusBadge";
 import type { TestResult, TestDefinition } from "@/lib/types";
 
 /* ── colour helpers ───────────────────────────────────────────────────────── */
 const SEV_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW"] as const;
+/* Bar fills encode the outcome mix of items in the bucket:
+   - all passing → green
+   - all failing → red
+   - mixed (some passing, some failing) → amber
+   The x-axis label already communicates which type/table the bar represents,
+   so the bar's colour is reserved for "is this group healthy?". */
 const BAR_COLORS: Record<string, string> = {
-  CRITICAL: "#dc2626",
-  HIGH: "#ef4444",
-  MEDIUM: "#f59e0b",
-  LOW: "#3b82f6",
-  PASSED: "#22c55e",
+  PASSED: STATUS_PALETTE.PASSED,  // #22C55E
+  FAILED: STATUS_PALETTE.FAILED,  // #EF4444
+  MIXED:  STATUS_PALETTE.ERROR,   // #F59E0B
 };
-const PIE_COLORS = ["#22c55e", "#ef4444", "#f59e0b", "#6b7280"]; // pass, fail, error, skip
 
 /* ── tiny animated number ─────────────────────────────────────────────────── */
 function AnimatedNumber({ value }: { value: number }) {
@@ -52,30 +67,40 @@ function AnimatedNumber({ value }: { value: number }) {
 /* ── custom tooltip ───────────────────────────────────────────────────────── */
 function ChartTooltip({ active, payload, label, level, dark }: any) {
   if (!active || !payload?.length) return null;
+  const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
   const count = payload[0].value;
   return (
-    <div className={`rounded-lg px-4 py-3 shadow-xl border ${
-      dark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"
-    }`}>
-      <p className="font-medium text-sm">{label}</p>
-      <p className={`text-xs mt-1 ${dark ? "text-gray-300" : "text-gray-600"}`}>
+    <div
+      className="px-3 py-2"
+      style={{
+        backgroundColor: palette.surfaceElevated,
+        border: `1px solid ${palette.borderSubtle}`,
+        borderRadius: "8px",
+        boxShadow: "0 4px 12px rgb(0 0 0 / 0.08)",
+        color: palette.textPrimary,
+      }}
+    >
+      <p className="text-body font-medium">{label}</p>
+      <p className="text-caption mt-0.5" style={{ color: palette.textSecondary, textTransform: "none", letterSpacing: "0" }}>
         {count} test{count !== 1 ? "s" : ""}
       </p>
       {level !== "detail" && (
-        <p className="text-blue-400 text-xs mt-1">Click to drill down →</p>
+        <p className="text-caption mt-1" style={{ color: BRAND_TEAL, textTransform: "none", letterSpacing: "0" }}>
+          Click to drill down →
+        </p>
       )}
     </div>
   );
 }
 
-/* ── severity colour for a bar based on the worst severity in that group ── */
-function worstSeverity(items: TestResult[]): string {
-  // If all items are passing, return a special key
-  if (items.every((r) => r.status === "PASSED")) return "PASSED";
-  for (const s of SEV_ORDER) {
-    if (items.some((r) => r.severity === s && r.status !== "PASSED")) return s;
-  }
-  return "MEDIUM";
+/* ── outcome classifier for a bar based on the mix of passing / failing items ── */
+function outcomeOf(items: TestResult[]): "PASSED" | "FAILED" | "MIXED" {
+  if (items.length === 0) return "PASSED";
+  const allPassed = items.every((r) => r.status === "PASSED");
+  if (allPassed) return "PASSED";
+  const nonePassed = items.every((r) => r.status !== "PASSED");
+  if (nonePassed) return "FAILED";
+  return "MIXED";
 }
 
 /* ══════════════════════════════════════════════════════════════════════════ */
@@ -83,12 +108,13 @@ export default function DashboardPage() {
   const { token, isLoading: authLoading } = useAuth();
   const { theme } = useTheme();
   const dark = theme === "dark";
+  const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
   const router = useRouter();
+  const { lastCompleted } = useRunContext();
   const [results, setResults] = useState<TestResult[]>([]);
   const [testDefs, setTestDefs] = useState<TestDefinition[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Drill state
   const [drillMode, setDrillMode] = useState<"type" | "table">("type");
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
@@ -110,14 +136,8 @@ export default function DashboardPage() {
       .then(([res, defs]) => { setResults(res); setTestDefs(defs); })
       .catch(() => router.push("/login"))
       .finally(() => setLoading(false));
-  }, [token, authLoading, router]);
+  }, [token, authLoading, router, lastCompleted]); // lastCompleted triggers re-fetch on run completion
 
-  // Map test_name → derived primary table for tests where the engine doesn't
-  // populate `r.table` (custom_sql joins multiple tables; relationship_check
-  // crosses two). Without this, the drill chart shows test names instead of
-  // tables for those test types.
-  //   - custom_sql:         parse the first `FROM <ident>` in the query
-  //   - relationship_check: read `config.source_table`
   const derivedTableMap = useMemo(() => {
     const m = new Map<string, string>();
     for (const def of testDefs) {
@@ -134,9 +154,6 @@ export default function DashboardPage() {
     return m;
   }, [testDefs]);
 
-  // Map test_name → SQL query string, for displaying the actual SQL run on
-  // custom_sql tests in the latest-results table expand row and the drill-down
-  // detail card.
   const queryByTestName = useMemo(() => {
     const m = new Map<string, string>();
     for (const def of testDefs) {
@@ -147,16 +164,17 @@ export default function DashboardPage() {
     return m;
   }, [testDefs]);
 
-  // Resolve the table label for a result row (for drill-chart bucketing).
-  // Priority: explicit r.table from engine → derived primary table → test_name fallback.
   const tableFor = (r: TestResult): string =>
     r.table || derivedTableMap.get(r.test_name) || r.test_name;
 
-  /* ── derived data (memoised) ──────────────────────────────────────────── */
   const latestResults = useMemo(() => {
     if (results.length === 0) return [];
-    const latestRun = results[0].run_at;
-    return results.filter((r) => r.run_at === latestRun);
+    const latestRunId = results[0].run_id;
+    if (latestRunId == null) {
+      const latestRun = results[0].run_at;
+      return results.filter((r) => r.run_at === latestRun);
+    }
+    return results.filter((r) => r.run_id === latestRunId);
   }, [results]);
 
   const chartResults = useMemo(() => {
@@ -167,7 +185,6 @@ export default function DashboardPage() {
     return base;
   }, [latestResults, severityFilter, statusFilter]);
 
-  // Summary counts (always from unfiltered latest)
   const summary = useMemo(() => {
     let passed = 0, failed = 0, errors = 0, skipped = 0;
     for (const r of latestResults) {
@@ -179,17 +196,21 @@ export default function DashboardPage() {
     return { total: latestResults.length, passed, failed, errors, skipped };
   }, [latestResults]);
 
-  const passRate = summary.total > 0 ? Math.round((summary.passed / summary.total) * 100) : 100;
+  const prevSummary = useMemo(() => {
+    // Find the second-distinct run_id in the results array (already sorted newest-first).
+    const latestId = results[0]?.run_id ?? null;
+    const prevId = results.find((r) => r.run_id !== latestId && r.run_id != null)?.run_id ?? null;
+    if (prevId == null) return null;
+    const prev = results.filter((r) => r.run_id === prevId);
+    let passed = 0, failed = 0, errors = 0;
+    for (const r of prev) {
+      if (r.status === "PASSED") passed++;
+      else if (r.status === "FAILED") failed++;
+      else if (r.status === "ERROR") errors++;
+    }
+    return { total: prev.length, passed, failed, errors };
+  }, [results]);
 
-  // Health ring data
-  const pieData = useMemo(() => [
-    { name: "Passed", value: summary.passed },
-    { name: "Failed", value: summary.failed },
-    { name: "Errors", value: summary.errors },
-    { name: "Skipped", value: summary.skipped },
-  ].filter((d) => d.value > 0), [summary]);
-
-  // Level 1: tests grouped by test_type
   const typeChartData = useMemo(() => {
     const groups: Record<string, TestResult[]> = {};
     for (const r of chartResults) {
@@ -200,12 +221,11 @@ export default function DashboardPage() {
         name: TYPE_LABELS[name] ?? name,
         rawName: name,
         count: items.length,
-        severity: worstSeverity(items),
+        outcome: outcomeOf(items),
       }))
       .sort((a, b) => b.count - a.count);
   }, [chartResults]);
 
-  // Level 2: tests grouped by table for the selected type
   const tableChartData = useMemo(() => {
     if (!selectedType) return [];
     const groups: Record<string, TestResult[]> = {};
@@ -215,11 +235,10 @@ export default function DashboardPage() {
       (groups[table] ??= []).push(r);
     }
     return Object.entries(groups)
-      .map(([name, items]) => ({ name, count: items.length, severity: worstSeverity(items) }))
+      .map(([name, items]) => ({ name, count: items.length, outcome: outcomeOf(items) }))
       .sort((a, b) => b.count - a.count);
   }, [chartResults, selectedType, derivedTableMap]);
 
-  // Level 3: detail rows
   const detailResults = useMemo(() => {
     if (!selectedTable || !selectedType) return [];
     return chartResults.filter((r) => {
@@ -228,7 +247,6 @@ export default function DashboardPage() {
     });
   }, [chartResults, selectedType, selectedTable, derivedTableMap]);
 
-  // "By Table" Level 1: all tables grouped
   const tableFirstChartData = useMemo(() => {
     const groups: Record<string, TestResult[]> = {};
     for (const r of chartResults) {
@@ -236,11 +254,10 @@ export default function DashboardPage() {
       (groups[table] ??= []).push(r);
     }
     return Object.entries(groups)
-      .map(([name, items]) => ({ name, count: items.length, severity: worstSeverity(items) }))
+      .map(([name, items]) => ({ name, count: items.length, outcome: outcomeOf(items) }))
       .sort((a, b) => b.count - a.count);
   }, [chartResults, derivedTableMap]);
 
-  // "By Table" Level 2: error types within selected table
   const typeInTableChartData = useMemo(() => {
     if (!selectedTableFirst) return [];
     const groups: Record<string, TestResult[]> = {};
@@ -250,11 +267,10 @@ export default function DashboardPage() {
       (groups[r.test_type] ??= []).push(r);
     }
     return Object.entries(groups)
-      .map(([name, items]) => ({ name: TYPE_LABELS[name] ?? name, rawName: name, count: items.length, severity: worstSeverity(items) }))
+      .map(([name, items]) => ({ name: TYPE_LABELS[name] ?? name, rawName: name, count: items.length, outcome: outcomeOf(items) }))
       .sort((a, b) => b.count - a.count);
   }, [chartResults, selectedTableFirst, derivedTableMap]);
 
-  // "By Table" Level 3: detail rows
   const detailResultsTableFirst = useMemo(() => {
     if (!selectedTableFirst || !selectedTypeSecond) return [];
     return chartResults.filter((r) => {
@@ -263,7 +279,6 @@ export default function DashboardPage() {
     });
   }, [chartResults, selectedTableFirst, selectedTypeSecond, derivedTableMap]);
 
-  /* ── severity filter counts (for the filter pills) ─────────────────── */
   const severityCounts = useMemo(() => {
     let base = latestResults;
     if (statusFilter === "issues") base = base.filter((r) => r.status !== "PASSED");
@@ -273,7 +288,6 @@ export default function DashboardPage() {
     return counts;
   }, [latestResults, statusFilter]);
 
-  /* ── handlers ──────────────────────────────────────────────────────── */
   const handleBack = () => {
     if (drillMode === "type") {
       if (selectedTable) setSelectedTable(null);
@@ -294,7 +308,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className={`animate-pulse ${dark ? "text-gray-500" : "text-gray-400"}`}>Loading results…</div>
+        <div className="text-body animate-pulse" style={{ color: palette.textSecondary }}>Loading results…</div>
       </div>
     );
   }
@@ -302,122 +316,111 @@ export default function DashboardPage() {
   /* ══════════════════════════════════════════════════════════════════════ */
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      {/* ── Header row: summary + health ring ──────────────────────────── */}
-      <div className="grid grid-cols-12 gap-4">
-        {/* Health ring */}
-        <div className={`col-span-3 rounded-xl p-5 flex flex-col items-center justify-center relative border ${dark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"}`}>
-          <PieChart width={140} height={140}>
-            <Pie
-              data={pieData}
-              cx={65}
-              cy={65}
-              innerRadius={45}
-              outerRadius={65}
-              dataKey="value"
-              startAngle={90}
-              endAngle={-270}
-              stroke="none"
-              animationDuration={800}
-            >
-              {pieData.map((entry, i) => (
-                <Cell
-                  key={entry.name}
-                  fill={PIE_COLORS[["Passed", "Failed", "Errors", "Skipped"].indexOf(entry.name)] || "#6b7280"}
-                />
-              ))}
-            </Pie>
-          </PieChart>
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="text-center">
-              <p className={`text-2xl font-bold ${passRate >= 80 ? "text-green-400" : passRate >= 50 ? "text-yellow-400" : "text-red-400"}`}>
-                {passRate}%
-              </p>
-            </div>
-          </div>
-          <p className={`text-xs mt-2 ${dark ? "text-gray-500" : "text-gray-400"}`}>Health Score</p>
-        </div>
-
-        {/* Summary cards */}
-        <div className="col-span-9 grid grid-cols-4 gap-4">
-          <SummaryCard label="Total Tests" value={summary.total} color={dark ? "text-white" : "text-gray-900"} icon="" dark={dark} />
-          <SummaryCard label="Passed" value={summary.passed} color="text-green-400" icon="✓" accent="bg-green-500/10 border-green-500/20" dark={dark} />
-          <SummaryCard label="Failed" value={summary.failed} color="text-red-400" icon="✗" accent="bg-red-500/10 border-red-500/20" dark={dark} />
-          <SummaryCard label="Errors" value={summary.errors} color="text-yellow-400" icon="⚠" accent="bg-yellow-500/10 border-yellow-500/20" dark={dark} />
-        </div>
+      {/* ── Metric cards: 4-up grid per UI-SPEC §"Metric cards" (D-05) ── */}
+      <div className="grid grid-cols-4 gap-6">
+        <SummaryCard label="Total Tests" value={summary.total}  delta={prevSummary != null ? summary.total  - prevSummary.total  : null} dark={dark} />
+        <SummaryCard label="Passed"      value={summary.passed} delta={prevSummary != null ? summary.passed - prevSummary.passed : null} dark={dark} />
+        <SummaryCard label="Failed"      value={summary.failed} delta={prevSummary != null ? summary.failed - prevSummary.failed : null} deltaPositiveIsBad dark={dark} />
+        <SummaryCard label="Errors"      value={summary.errors} delta={prevSummary != null ? summary.errors - prevSummary.errors : null} deltaPositiveIsBad dark={dark} />
       </div>
 
       {/* ── Drill-down chart ───────────────────────────────────────────── */}
-      <div className={`rounded-xl border p-6 ${dark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"}`}>
+      <div
+        className="p-6"
+        style={{
+          backgroundColor: palette.surfaceElevated,
+          border: `1px solid ${palette.borderSubtle}`,
+          borderRadius: "8px",
+        }}
+      >
         {/* Status toggle + View-by toggle */}
         <div className="flex items-center justify-between mb-4">
-          <div className={`flex items-center rounded-lg p-0.5 gap-0.5 ${dark ? "bg-gray-800" : "bg-gray-100"}`}>
+          <div
+            className="flex items-center rounded-lg p-0.5 gap-0.5"
+            style={{ backgroundColor: palette.surfaceBg }}
+          >
             {([
               ["issues", "Issues Only", latestResults.filter((r) => r.status !== "PASSED").length],
               ["all", "All Tests", latestResults.length],
               ["passing", "Passing", latestResults.filter((r) => r.status === "PASSED").length],
-            ] as ["issues" | "all" | "passing", string, number][]).map(([key, label, count]) => (
-              <button
-                key={key}
-                onClick={() => { setStatusFilter(key); resetDrill(); }}
-                className={`text-xs px-3 py-1.5 rounded-md transition-all ${
-                  statusFilter === key
-                    ? dark ? "bg-gray-700 text-white font-medium" : "bg-white text-gray-900 font-medium shadow-sm"
-                    : dark ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-900"
-                }`}
-              >
-                {label} ({count})
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-3">
-            <span className={`text-xs ${dark ? "text-gray-600" : "text-gray-400"}`}>View by:</span>
-            <div className={`flex items-center rounded-lg p-0.5 gap-0.5 ${dark ? "bg-gray-800" : "bg-gray-100"}`}>
-              {([["type", "Error Type"], ["table", "Table"]] as ["type" | "table", string][]).map(([key, label]) => (
+            ] as ["issues" | "all" | "passing", string, number][]).map(([key, label, count]) => {
+              const active = statusFilter === key;
+              return (
                 <button
                   key={key}
-                  onClick={() => { setDrillMode(key); resetDrill(); }}
-                  className={`text-xs px-3 py-1.5 rounded-md transition-all ${
-                    drillMode === key
-                      ? dark ? "bg-gray-700 text-white font-medium" : "bg-white text-gray-900 font-medium shadow-sm"
-                      : dark ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-900"
-                  }`}
+                  onClick={() => { setStatusFilter(key); resetDrill(); }}
+                  className="text-xs px-3 py-1.5 rounded-md transition-all"
+                  style={{
+                    backgroundColor: active ? palette.surfaceElevated : "transparent",
+                    color: active ? palette.textPrimary : palette.textSecondary,
+                    fontWeight: active ? 500 : 400,
+                    boxShadow: active ? "0 1px 2px rgb(0 0 0 / 0.06)" : "none",
+                  }}
                 >
-                  {label}
+                  {label} ({count})
                 </button>
-              ))}
+              );
+            })}
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-caption" style={{ color: palette.textSecondary, textTransform: "none", letterSpacing: "0" }}>View by:</span>
+            <div
+              className="flex items-center rounded-lg p-0.5 gap-0.5"
+              style={{ backgroundColor: palette.surfaceBg }}
+            >
+              {([["type", "Error Type"], ["table", "Table"]] as ["type" | "table", string][]).map(([key, label]) => {
+                const active = drillMode === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => { setDrillMode(key); resetDrill(); }}
+                    className="text-xs px-3 py-1.5 rounded-md transition-all"
+                    style={{
+                      backgroundColor: active ? palette.surfaceElevated : "transparent",
+                      color: active ? palette.textPrimary : palette.textSecondary,
+                      fontWeight: active ? 500 : 400,
+                      boxShadow: active ? "0 1px 2px rgb(0 0 0 / 0.06)" : "none",
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
 
         {/* Breadcrumb + severity filter */}
         <div className="flex items-center justify-between mb-5">
-          {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-sm">
             {((drillMode === "type" && drillLevel !== "type") || (drillMode === "table" && tableDrillLevel !== "tableList")) && (
-              <button onClick={handleBack} className={`mr-1 transition-colors ${dark ? "text-gray-500 hover:text-white" : "text-gray-400 hover:text-gray-900"}`}>
+              <button
+                onClick={handleBack}
+                className="mr-1 transition-colors"
+                style={{ color: palette.textSecondary }}
+              >
                 ←
               </button>
             )}
             <button
               onClick={resetDrill}
-              className={(drillMode === "type" ? drillLevel === "type" : tableDrillLevel === "tableList")
-                ? dark ? "text-white font-semibold" : "text-gray-900 font-semibold"
-                : dark ? "text-gray-500 hover:text-gray-300 transition-colors" : "text-gray-400 hover:text-gray-700 transition-colors"
-              }
+              style={{
+                color: (drillMode === "type" ? drillLevel === "type" : tableDrillLevel === "tableList") ? palette.textPrimary : palette.textSecondary,
+                fontWeight: (drillMode === "type" ? drillLevel === "type" : tableDrillLevel === "tableList") ? 600 : 400,
+              }}
             >
               {statusFilter === "passing" ? "Passing Tests" : statusFilter === "all" ? "All Tests" : "Issues"}
             </button>
 
-            {/* By Type breadcrumb */}
             {drillMode === "type" && selectedType && (
               <>
-                <span className={dark ? "text-gray-700" : "text-gray-300"}>/</span>
+                <span style={{ color: palette.borderSubtle }}>/</span>
                 <button
                   onClick={() => setSelectedTable(null)}
-                  className={drillLevel === "table"
-                    ? dark ? "text-white font-semibold" : "text-gray-900 font-semibold"
-                    : dark ? "text-gray-500 hover:text-gray-300 transition-colors" : "text-gray-400 hover:text-gray-700 transition-colors"
-                  }
+                  style={{
+                    color: drillLevel === "table" ? palette.textPrimary : palette.textSecondary,
+                    fontWeight: drillLevel === "table" ? 600 : 400,
+                  }}
                 >
                   {TYPE_LABELS[selectedType] ?? selectedType}
                 </button>
@@ -425,21 +428,20 @@ export default function DashboardPage() {
             )}
             {drillMode === "type" && selectedTable && (
               <>
-                <span className={dark ? "text-gray-700" : "text-gray-300"}>/</span>
-                <span className={dark ? "text-white font-semibold" : "text-gray-900 font-semibold"}>{selectedTable}</span>
+                <span style={{ color: palette.borderSubtle }}>/</span>
+                <span style={{ color: palette.textPrimary, fontWeight: 600 }}>{selectedTable}</span>
               </>
             )}
 
-            {/* By Table breadcrumb */}
             {drillMode === "table" && selectedTableFirst && (
               <>
-                <span className={dark ? "text-gray-700" : "text-gray-300"}>/</span>
+                <span style={{ color: palette.borderSubtle }}>/</span>
                 <button
                   onClick={() => setSelectedTypeSecond(null)}
-                  className={tableDrillLevel === "typeInTable"
-                    ? dark ? "text-white font-semibold" : "text-gray-900 font-semibold"
-                    : dark ? "text-gray-500 hover:text-gray-300 transition-colors" : "text-gray-400 hover:text-gray-700 transition-colors"
-                  }
+                  style={{
+                    color: tableDrillLevel === "typeInTable" ? palette.textPrimary : palette.textSecondary,
+                    fontWeight: tableDrillLevel === "typeInTable" ? 600 : 400,
+                  }}
                 >
                   {selectedTableFirst}
                 </button>
@@ -447,20 +449,20 @@ export default function DashboardPage() {
             )}
             {drillMode === "table" && selectedTypeSecond && (
               <>
-                <span className={dark ? "text-gray-700" : "text-gray-300"}>/</span>
-                <span className={dark ? "text-white font-semibold" : "text-gray-900 font-semibold"}>{TYPE_LABELS[selectedTypeSecond] ?? selectedTypeSecond}</span>
+                <span style={{ color: palette.borderSubtle }}>/</span>
+                <span style={{ color: palette.textPrimary, fontWeight: 600 }}>{TYPE_LABELS[selectedTypeSecond] ?? selectedTypeSecond}</span>
               </>
             )}
           </div>
 
           {/* Severity filter pills */}
           <div className="flex items-center gap-2">
-            <span className={`text-xs mr-1 ${dark ? "text-gray-600" : "text-gray-400"}`}>Filter:</span>
+            <span className="text-caption mr-1" style={{ color: palette.textSecondary, textTransform: "none", letterSpacing: "0" }}>Filter:</span>
             <FilterPill
               label="All"
               count={Object.values(severityCounts).reduce((a, b) => a + b, 0)}
               active={severityFilter === null}
-              color="#9ca3af"
+              color={palette.textSecondary}
               onClick={() => setSeverityFilter(null)}
             />
             {SEV_ORDER.map((s) =>
@@ -481,14 +483,13 @@ export default function DashboardPage() {
         {/* Chart area */}
         <div className="transition-all duration-300">
 
-          {/* ── By Error Type mode ── */}
           {drillMode === "type" && drillLevel === "type" && (
             typeChartData.length > 0 ? (
               <DrillBarChart
                 data={typeChartData}
                 dark={dark}
                 level="type"
-                onBarClick={(d, i) => setSelectedType(typeChartData[i].rawName)}
+                onBarClick={(_d, i) => setSelectedType(typeChartData[i].rawName)}
               />
             ) : (
               <EmptyChart statusFilter={statusFilter} dark={dark} />
@@ -500,10 +501,10 @@ export default function DashboardPage() {
                 data={tableChartData}
                 dark={dark}
                 level="table"
-                onBarClick={(d, i) => setSelectedTable(tableChartData[i].name)}
+                onBarClick={(_d, i) => setSelectedTable(tableChartData[i].name)}
               />
             ) : (
-              <div className={`flex items-center justify-center h-48 ${dark ? "text-gray-500" : "text-gray-400"}`}>
+              <div className="flex items-center justify-center h-48 text-body" style={{ color: palette.textSecondary }}>
                 No tests for this filter combination
               </div>
             )
@@ -512,14 +513,13 @@ export default function DashboardPage() {
             <DetailList results={detailResults} dark={dark} queryByTestName={queryByTestName} />
           )}
 
-          {/* ── By Table mode ── */}
           {drillMode === "table" && tableDrillLevel === "tableList" && (
             tableFirstChartData.length > 0 ? (
               <DrillBarChart
                 data={tableFirstChartData}
                 dark={dark}
                 level="type"
-                onBarClick={(d, i) => setSelectedTableFirst(tableFirstChartData[i].name)}
+                onBarClick={(_d, i) => setSelectedTableFirst(tableFirstChartData[i].name)}
               />
             ) : (
               <EmptyChart statusFilter={statusFilter} dark={dark} />
@@ -531,10 +531,10 @@ export default function DashboardPage() {
                 data={typeInTableChartData}
                 dark={dark}
                 level="table"
-                onBarClick={(d, i) => setSelectedTypeSecond(typeInTableChartData[i].rawName)}
+                onBarClick={(_d, i) => setSelectedTypeSecond(typeInTableChartData[i].rawName)}
               />
             ) : (
-              <div className={`flex items-center justify-center h-48 ${dark ? "text-gray-500" : "text-gray-400"}`}>
+              <div className="flex items-center justify-center h-48 text-body" style={{ color: palette.textSecondary }}>
                 No tests for this filter combination
               </div>
             )
@@ -555,30 +555,37 @@ export default function DashboardPage() {
 function DrillBarChart({
   data, dark, level, onBarClick,
 }: {
-  data: { name: string; count: number; severity: string }[];
+  data: { name: string; count: number; outcome: string; rawName?: string }[];
   dark: boolean;
   level: string;
   onBarClick: (d: unknown, i: number) => void;
 }) {
+  const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
   return (
     <ResponsiveContainer width="100%" height={320}>
       <BarChart data={data} barCategoryGap="25%">
         <XAxis
           dataKey="name"
-          tick={{ fill: dark ? "#9ca3af" : "#6b7280", fontSize: 12 }}
-          axisLine={{ stroke: dark ? "#374151" : "#d1d5db" }}
+          tick={{ fill: palette.textSecondary, fontSize: 12, fontFamily: "var(--font-inter)" }}
+          axisLine={{ stroke: palette.borderSubtle }}
           tickLine={false}
         />
         <YAxis
-          tick={{ fill: dark ? "#9ca3af" : "#6b7280", fontSize: 12 }}
+          tick={{ fill: palette.textSecondary, fontSize: 12, fontFamily: "var(--font-inter)" }}
           axisLine={false}
           tickLine={false}
           allowDecimals={false}
         />
-        <Tooltip content={<ChartTooltip level={level} dark={dark} />} cursor={{ fill: dark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.04)" }} />
+        <Tooltip
+          content={<ChartTooltip level={level} dark={dark} />}
+          cursor={{ fill: dark ? "rgba(232,236,243,0.04)" : "rgba(14,22,38,0.04)" }}
+        />
         <Bar dataKey="count" radius={[8, 8, 0, 0]} cursor="pointer" animationDuration={600} onClick={onBarClick}>
-          {data.map((d, i) => (
-            <Cell key={i} fill={BAR_COLORS[d.severity] || "#6b7280"} />
+          {data.map((d: any, i: number) => (
+            <Cell
+              key={i}
+              fill={BAR_COLORS[d.outcome] || palette.textSecondary}
+            />
           ))}
         </Bar>
       </BarChart>
@@ -587,14 +594,19 @@ function DrillBarChart({
 }
 
 function EmptyChart({ statusFilter, dark }: { statusFilter: string; dark: boolean }) {
+  const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
   return (
     <div className="flex flex-col items-center justify-center h-48 gap-2">
-      <span className="text-4xl">{statusFilter === "issues" ? "✓" : "—"}</span>
-      <p className={`text-lg font-medium ${statusFilter === "issues" ? "text-green-400" : "text-gray-500"}`}>
-        {statusFilter === "issues" ? "All tests passing" : "No tests match this filter"}
+      <p
+        className="text-heading"
+        style={{ color: statusFilter === "issues" ? BRAND_TEAL : palette.textPrimary }}
+      >
+        {statusFilter === "issues" ? "All tests passing" : "No tests have run yet"}
       </p>
-      <p className={`text-sm ${dark ? "text-gray-600" : "text-gray-400"}`}>
-        {statusFilter === "issues" ? "No issues detected in the latest run" : "Try changing the filter above"}
+      <p className="text-body" style={{ color: palette.textSecondary }}>
+        {statusFilter === "issues"
+          ? "No issues detected in the latest run"
+          : "Run your tests to see results here — click Run all to trigger a run."}
       </p>
     </div>
   );
@@ -609,6 +621,7 @@ function DetailList({
   dark: boolean;
   queryByTestName: Map<string, string>;
 }) {
+  const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
   return (
     <div className="space-y-3 max-h-[400px] overflow-auto pr-2">
       {results.length > 0 ? (
@@ -616,7 +629,7 @@ function DetailList({
           <DetailCard key={r.id} result={r} sqlQuery={queryByTestName.get(r.test_name)} />
         ))
       ) : (
-        <div className={`flex items-center justify-center h-48 ${dark ? "text-gray-500" : "text-gray-400"}`}>
+        <div className="flex items-center justify-center h-48 text-body" style={{ color: palette.textSecondary }}>
           No tests match the current filter
         </div>
       )}
@@ -629,26 +642,52 @@ function DetailList({
 function SummaryCard({
   label,
   value,
-  color,
-  icon,
-  accent,
+  delta,
+  deltaPositiveIsBad = false,
   dark = true,
 }: {
   label: string;
   value: number;
-  color: string;
-  icon: string;
-  accent?: string;
+  delta?: number | null;
+  deltaPositiveIsBad?: boolean;
   dark?: boolean;
 }) {
+  const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
+
+  let trendColor: string = palette.textSecondary;
+  let glyph = "•";
+  let trendLabel = "first run";
+
+  if (delta != null) {
+    if (delta === 0) {
+      trendLabel = "last run";
+    } else {
+      glyph = delta > 0 ? "▲" : "▼";
+      const isGood = delta > 0 ? !deltaPositiveIsBad : deltaPositiveIsBad;
+      trendColor = isGood ? BRAND_TEAL : "#EF4444";
+      trendLabel = delta > 0 ? `+${delta}` : `${delta}`;
+    }
+  }
+
   return (
-    <div className={`rounded-xl p-5 border transition-colors ${accent || (dark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200")}`}>
-      <div className="flex items-center justify-between">
-        <p className={`text-sm ${dark ? "text-gray-400" : "text-gray-500"}`}>{label}</p>
-        <span className="text-lg opacity-50">{icon}</span>
-      </div>
-      <p className={`text-3xl font-bold mt-2 ${color}`}>
+    <div
+      className="p-4"
+      style={{
+        backgroundColor: palette.surfaceElevated,
+        border: `1px solid ${palette.borderSubtle}`,
+        borderRadius: "8px",
+      }}
+    >
+      <p className="text-body" style={{ color: palette.textSecondary }}>{label}</p>
+      <p
+        className="mt-2 text-display"
+        style={{ fontFamily: "var(--font-jetbrains-mono)", color: palette.textPrimary }}
+      >
         <AnimatedNumber value={value} />
+      </p>
+      <p className="mt-1 text-caption flex items-center gap-1" style={{ color: trendColor, textTransform: "none", letterSpacing: "0" }}>
+        <span style={{ fontSize: "10px" }}>{glyph}</span>
+        <span style={{ fontFamily: "var(--font-jetbrains-mono)" }}>{trendLabel}</span>
       </p>
     </div>
   );
@@ -705,6 +744,7 @@ function ResultsTable({
 }) {
   const { theme } = useTheme();
   const dark = theme === "dark";
+  const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
   const [filter, setFilter] = useState<TableFilter>("all");
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
 
@@ -717,52 +757,76 @@ function ResultsTable({
   const runTime = results.length > 0 ? new Date(results[0].run_at).toLocaleString() : null;
 
   return (
-    <div className={`rounded-xl border overflow-hidden ${dark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"}`}>
-      <div className={`px-6 py-4 border-b flex items-center justify-between ${dark ? "border-gray-800" : "border-gray-200"}`}>
+    <div
+      className="overflow-hidden"
+      style={{
+        backgroundColor: palette.surfaceElevated,
+        border: `1px solid ${palette.borderSubtle}`,
+        borderRadius: "8px",
+      }}
+    >
+      <div
+        className="px-6 py-4 flex items-center justify-between"
+        style={{ borderBottom: `1px solid ${palette.borderSubtle}` }}
+      >
         <div>
-          <h2 className={`font-medium ${dark ? "text-white" : "text-gray-900"}`}>Latest Run Results</h2>
+          <h2 className="text-heading" style={{ color: palette.textPrimary }}>Latest Run Results</h2>
           {runTime && (
-            <p className={`text-sm mt-0.5 ${dark ? "text-gray-500" : "text-gray-400"}`}>
+            <p className="text-body mt-0.5" style={{ color: palette.textSecondary }}>
               {runTime} · {summary.total} tests
             </p>
           )}
         </div>
         {/* Status filter tabs */}
-        <div className={`flex items-center rounded-lg p-0.5 gap-0.5 ${dark ? "bg-gray-800" : "bg-gray-100"}`}>
+        <div
+          className="flex items-center rounded-lg p-0.5 gap-0.5"
+          style={{ backgroundColor: palette.surfaceBg }}
+        >
           {([
             ["all", "All", results.length],
             ["issues", "Issues", results.filter((r) => r.status !== "PASSED").length],
             ["passing", "Passing", results.filter((r) => r.status === "PASSED").length],
-          ] as [TableFilter, string, number][]).map(([key, label, count]) => (
-            <button
-              key={key}
-              onClick={() => setFilter(key)}
-              className={`text-xs px-3 py-1.5 rounded-md transition-all ${
-                filter === key
-                  ? dark ? "bg-gray-700 text-white font-medium" : "bg-white text-gray-900 font-medium shadow-sm"
-                  : dark ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-900"
-              }`}
-            >
-              {label} ({count})
-            </button>
-          ))}
+          ] as [TableFilter, string, number][]).map(([key, label, count]) => {
+            const active = filter === key;
+            return (
+              <button
+                key={key}
+                onClick={() => setFilter(key)}
+                className="text-xs px-3 py-1.5 rounded-md transition-all"
+                style={{
+                  backgroundColor: active ? palette.surfaceElevated : "transparent",
+                  color: active ? palette.textPrimary : palette.textSecondary,
+                  fontWeight: active ? 500 : 400,
+                  boxShadow: active ? "0 1px 2px rgb(0 0 0 / 0.06)" : "none",
+                }}
+              >
+                {label} ({count})
+              </button>
+            );
+          })}
         </div>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className={`sticky top-0 ${dark ? "bg-gray-800/50" : "bg-gray-50"}`}>
-            <tr className={`text-left ${dark ? "text-gray-400" : "text-gray-500"}`}>
-              <th className="px-6 py-3 font-medium w-8"></th>
-              <th className="px-6 py-3 font-medium">Test</th>
-              <th className="px-6 py-3 font-medium">Type</th>
-              <th className="px-6 py-3 font-medium">Table</th>
-              <th className="px-6 py-3 font-medium">Column(s)</th>
-              <th className="px-6 py-3 font-medium">Status</th>
-              <th className="px-6 py-3 font-medium">Severity</th>
-              <th className="px-6 py-3 font-medium">Message</th>
+          <thead
+            className="sticky top-0"
+            style={{ backgroundColor: palette.surfaceBg }}
+          >
+            <tr style={{ color: palette.textSecondary }}>
+              {/* 7px dot column */}
+              <th className="pl-6 py-3" style={{ width: "24px" }}></th>
+              {/* Expand-arrow column */}
+              <th className="px-2 py-3" style={{ width: "24px" }}></th>
+              <th className="px-4 py-3 text-left text-caption">Test</th>
+              <th className="px-4 py-3 text-left text-caption">Type</th>
+              <th className="px-4 py-3 text-left text-caption">Table</th>
+              <th className="px-4 py-3 text-left text-caption">Column(s)</th>
+              <th className="px-4 py-3 text-left text-caption">Status</th>
+              <th className="px-4 py-3 text-left text-caption">Severity</th>
+              <th className="px-4 py-3 text-left text-caption">Message</th>
             </tr>
           </thead>
-          <tbody className={`divide-y ${dark ? "divide-gray-800/50" : "divide-gray-100"}`}>
+          <tbody style={{ borderTop: `1px solid ${palette.borderSubtle}` }}>
             {filtered.map((r) => {
               const isExpanded = expandedRow === r.id;
               const metricEntries = Object.entries(r.metrics || {}).filter(
@@ -774,35 +838,103 @@ function ResultsTable({
               return (
                 <Fragment key={r.id}>
                   <tr
-                    className={`transition-colors cursor-pointer ${dark ? "hover:bg-gray-800/30" : "hover:bg-gray-50"}`}
+                    className="transition-colors cursor-pointer"
+                    style={{ height: "40px", borderTop: `1px solid ${palette.borderSubtle}` }}
                     onClick={() => setExpandedRow(isExpanded ? null : r.id)}
+                    onMouseEnter={(e) => ((e.currentTarget as HTMLTableRowElement).style.backgroundColor = dark ? "rgba(232,236,243,0.04)" : "rgba(14,22,38,0.04)")}
+                    onMouseLeave={(e) => ((e.currentTarget as HTMLTableRowElement).style.backgroundColor = "transparent")}
                   >
-                    <td className="pl-6 py-3 text-gray-600 text-xs">
+                    {/* 7px solid status dot */}
+                    <td className="pl-6 py-3"><StatusDot status={r.status} /></td>
+
+                    {/* Expand chevron */}
+                    <td className="px-2 py-3 text-caption" style={{ color: palette.textSecondary, textTransform: "none", letterSpacing: "0" }}>
                       {hasExpandContent ? (isExpanded ? "▼" : "▶") : ""}
                     </td>
-                    <td className={`px-6 py-3 max-w-xs truncate ${dark ? "text-white" : "text-gray-900"}`} title={r.test_name}>{r.test_name}</td>
-                    <td className={`px-6 py-3 ${dark ? "text-gray-400" : "text-gray-500"}`}>{TYPE_LABELS[r.test_type] ?? r.test_type}</td>
-                    <td className={`px-6 py-3 max-w-[12rem] truncate font-mono text-xs ${dark ? "text-gray-300" : "text-gray-600"}`} title={extractTable(r)}>{extractTable(r)}</td>
-                    <td className={`px-6 py-3 max-w-[10rem] truncate font-mono text-xs ${dark ? "text-gray-300" : "text-gray-600"}`} title={extractColumns(r)}>{extractColumns(r)}</td>
-                    <td className="px-6 py-3"><StatusBadge status={r.status} /></td>
-                    <td className="px-6 py-3"><SeverityBadge severity={r.severity} /></td>
-                    <td className={`px-6 py-3 max-w-xs truncate ${dark ? "text-gray-400" : "text-gray-500"}`} title={r.message}>{r.message}</td>
+
+                    {/* Test name — verbatim per Phase 1 D-05, JetBrains Mono */}
+                    <td
+                      className="px-4 py-3 max-w-xs truncate text-body"
+                      style={{
+                        fontFamily: "var(--font-jetbrains-mono)",
+                        color: palette.textPrimary,
+                      }}
+                      title={r.test_name}
+                    >
+                      {r.test_name}
+                    </td>
+
+                    {/* Type column — TypePill */}
+                    <td className="px-4 py-3"><TypePill type={r.test_type} dark={dark} /></td>
+
+                    {/* Table cell — mono */}
+                    <td
+                      className="px-4 py-3 max-w-[12rem] truncate text-caption"
+                      style={{
+                        fontFamily: "var(--font-jetbrains-mono)",
+                        color: palette.textSecondary,
+                        textTransform: "none",
+                        letterSpacing: "0",
+                      }}
+                      title={extractTable(r)}
+                    >
+                      {extractTable(r)}
+                    </td>
+
+                    {/* Column(s) — mono */}
+                    <td
+                      className="px-4 py-3 max-w-[10rem] truncate text-caption"
+                      style={{
+                        fontFamily: "var(--font-jetbrains-mono)",
+                        color: palette.textSecondary,
+                        textTransform: "none",
+                        letterSpacing: "0",
+                      }}
+                      title={extractColumns(r)}
+                    >
+                      {extractColumns(r)}
+                    </td>
+
+                    <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
+                    <td className="px-4 py-3"><SeverityBadge severity={r.severity} /></td>
+
+                    <td
+                      className="px-4 py-3 max-w-xs truncate text-body"
+                      style={{ color: palette.textSecondary }}
+                      title={r.message}
+                    >
+                      {r.message}
+                    </td>
                   </tr>
                   {isExpanded && hasExpandContent && (
-                    <tr>
-                      <td colSpan={8} className={`px-12 py-3 ${dark ? "bg-gray-800/20" : "bg-gray-50"}`}>
+                    <tr style={{ borderTop: `1px solid ${palette.borderSubtle}` }}>
+                      <td
+                        colSpan={9}
+                        className="px-12 py-3"
+                        style={{ backgroundColor: palette.surfaceBg }}
+                      >
                         {isCustomSql && sqlQuery && (
-                          <div className={`mb-3 rounded-lg overflow-hidden border ${
-                            dark ? "bg-gray-950 border-gray-800" : "bg-white border-gray-200"
-                          }`}>
-                            <div className={`px-4 py-2 border-b text-xs font-mono ${
-                              dark ? "border-gray-800 text-gray-500" : "border-gray-200 text-gray-500"
-                            }`}>
+                          <div
+                            className="mb-3 overflow-hidden"
+                            style={{
+                              backgroundColor: palette.surfaceElevated,
+                              border: `1px solid ${palette.borderSubtle}`,
+                              borderRadius: "8px",
+                            }}
+                          >
+                            <div
+                              className="px-4 py-2 font-mono text-xs"
+                              style={{
+                                borderBottom: `1px solid ${palette.borderSubtle}`,
+                                color: palette.textSecondary,
+                              }}
+                            >
                               query
                             </div>
-                            <pre className={`px-4 py-3 font-mono text-xs overflow-x-auto whitespace-pre max-h-64 overflow-y-auto ${
-                              dark ? "text-gray-300" : "text-gray-700"
-                            }`}>
+                            <pre
+                              className="px-4 py-3 font-mono text-xs overflow-x-auto whitespace-pre max-h-64 overflow-y-auto"
+                              style={{ color: palette.textPrimary }}
+                            >
                               <code>{sqlQuery}</code>
                             </pre>
                           </div>
@@ -810,10 +942,19 @@ function ResultsTable({
                         {metricEntries.length > 0 && (
                           <div className="grid grid-cols-4 gap-3">
                             {metricEntries.map(([key, val]) => (
-                              <div key={key} className={`rounded-lg px-3 py-2 ${dark ? "bg-gray-900/50" : "bg-white border border-gray-200"}`}>
-                                <p className={`text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>{formatConfigKey(key)}</p>
+                              <div
+                                key={key}
+                                className="px-3 py-2"
+                                style={{
+                                  backgroundColor: palette.surfaceElevated,
+                                  border: `1px solid ${palette.borderSubtle}`,
+                                  borderRadius: "8px",
+                                }}
+                              >
+                                <p className="text-caption" style={{ color: palette.textSecondary }}>{formatConfigKey(key)}</p>
                                 <p
-                                  className={`text-sm font-medium mt-0.5 truncate ${dark ? "text-white" : "text-gray-900"}`}
+                                  className="text-body font-medium mt-0.5 truncate"
+                                  style={{ color: palette.textPrimary }}
                                   title={typeof val === "object" ? JSON.stringify(val) : String(val)}
                                 >
                                   {typeof val === "number"
@@ -842,6 +983,7 @@ function ResultsTable({
 function DetailCard({ result: r, sqlQuery }: { result: TestResult; sqlQuery?: string }) {
   const { theme } = useTheme();
   const dark = theme === "dark";
+  const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
   const [expanded, setExpanded] = useState(false);
   const metrics = r.metrics || {};
   const table = extractTable(r);
@@ -853,17 +995,24 @@ function DetailCard({ result: r, sqlQuery }: { result: TestResult; sqlQuery?: st
 
   return (
     <div
-      className={`border rounded-lg p-4 transition-colors cursor-pointer ${
-        dark
-          ? "bg-gray-800/50 border-gray-700/50 hover:border-gray-600"
-          : "bg-gray-50 border-gray-200 hover:border-gray-300"
-      }`}
+      className="p-4 transition-colors cursor-pointer"
+      style={{
+        backgroundColor: palette.surfaceBg,
+        border: `1px solid ${palette.borderSubtle}`,
+        borderRadius: "8px",
+      }}
       onClick={() => setExpanded(!expanded)}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <span className={`text-xs ${dark ? "text-gray-600" : "text-gray-400"}`}>{expanded ? "▼" : "▶"}</span>
-          <span className={`font-medium truncate ${dark ? "text-white" : "text-gray-900"}`} title={r.test_name}>{r.test_name}</span>
+          <span className="text-caption" style={{ color: palette.textSecondary, textTransform: "none", letterSpacing: "0" }}>{expanded ? "▼" : "▶"}</span>
+          <span
+            className="font-medium truncate text-body"
+            style={{ color: palette.textPrimary, fontFamily: "var(--font-jetbrains-mono)" }}
+            title={r.test_name}
+          >
+            {r.test_name}
+          </span>
         </div>
         <div className="flex gap-2 shrink-0">
           <StatusBadge status={r.status} />
@@ -871,23 +1020,23 @@ function DetailCard({ result: r, sqlQuery }: { result: TestResult; sqlQuery?: st
         </div>
       </div>
 
-      {/* Table + column info */}
       <div className="flex items-center gap-4 mt-2 ml-6">
         {table !== "—" && (
-          <span className={`text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>
-            Table: <span className={`font-mono ${dark ? "text-gray-300" : "text-gray-700"}`}>{table}</span>
+          <span className="text-caption" style={{ color: palette.textSecondary, textTransform: "none", letterSpacing: "0" }}>
+            Table: <span style={{ fontFamily: "var(--font-jetbrains-mono)", color: palette.textPrimary }}>{table}</span>
           </span>
         )}
         {columns !== "—" && (
-          <span className={`text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>
-            Column{columns.includes(",") ? "s" : ""}: <span className={`font-mono ${dark ? "text-gray-300" : "text-gray-700"}`}>{columns}</span>
+          <span className="text-caption" style={{ color: palette.textSecondary, textTransform: "none", letterSpacing: "0" }}>
+            Column{columns.includes(",") ? "s" : ""}: <span style={{ fontFamily: "var(--font-jetbrains-mono)", color: palette.textPrimary }}>{columns}</span>
           </span>
         )}
       </div>
 
       {r.message && (
         <p
-          className={`text-sm mt-1.5 ml-6 ${expanded ? "" : "line-clamp-2"} ${dark ? "text-gray-400" : "text-gray-500"}`}
+          className={`text-body mt-1.5 ml-6 ${expanded ? "" : "line-clamp-2"}`}
+          style={{ color: palette.textSecondary }}
           title={r.message}
         >
           {r.message}
@@ -895,17 +1044,27 @@ function DetailCard({ result: r, sqlQuery }: { result: TestResult; sqlQuery?: st
       )}
 
       {expanded && isCustomSql && sqlQuery && (
-        <div className={`mt-3 ml-6 rounded-lg overflow-hidden border ${
-          dark ? "bg-gray-950 border-gray-800" : "bg-white border-gray-200"
-        }`}>
-          <div className={`px-4 py-2 border-b text-xs font-mono ${
-            dark ? "border-gray-800 text-gray-500" : "border-gray-200 text-gray-500"
-          }`}>
+        <div
+          className="mt-3 ml-6 overflow-hidden"
+          style={{
+            backgroundColor: palette.surfaceElevated,
+            border: `1px solid ${palette.borderSubtle}`,
+            borderRadius: "8px",
+          }}
+        >
+          <div
+            className="px-4 py-2 font-mono text-xs"
+            style={{
+              borderBottom: `1px solid ${palette.borderSubtle}`,
+              color: palette.textSecondary,
+            }}
+          >
             query
           </div>
-          <pre className={`px-4 py-3 font-mono text-xs overflow-x-auto whitespace-pre max-h-64 overflow-y-auto ${
-            dark ? "text-gray-300" : "text-gray-700"
-          }`}>
+          <pre
+            className="px-4 py-3 font-mono text-xs overflow-x-auto whitespace-pre max-h-64 overflow-y-auto"
+            style={{ color: palette.textPrimary }}
+          >
             <code>{sqlQuery}</code>
           </pre>
         </div>
@@ -914,10 +1073,19 @@ function DetailCard({ result: r, sqlQuery }: { result: TestResult; sqlQuery?: st
       {expanded && metricEntries.length > 0 && (
         <div className="mt-3 ml-6 grid grid-cols-3 gap-3">
           {metricEntries.map(([key, val]) => (
-            <div key={key} className={`rounded-lg px-3 py-2 ${dark ? "bg-gray-900/50" : "bg-white border border-gray-200"}`}>
-              <p className={`text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>{formatConfigKey(key)}</p>
+            <div
+              key={key}
+              className="px-3 py-2"
+              style={{
+                backgroundColor: palette.surfaceElevated,
+                border: `1px solid ${palette.borderSubtle}`,
+                borderRadius: "8px",
+              }}
+            >
+              <p className="text-caption" style={{ color: palette.textSecondary }}>{formatConfigKey(key)}</p>
               <p
-                className={`text-sm font-medium mt-0.5 truncate ${dark ? "text-white" : "text-gray-900"}`}
+                className="text-body font-medium mt-0.5 truncate"
+                style={{ color: palette.textPrimary }}
                 title={typeof val === "object" ? JSON.stringify(val) : String(val)}
               >
                 {typeof val === "number"

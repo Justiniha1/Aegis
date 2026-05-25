@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from dashboard_api import models, schemas
@@ -9,6 +9,12 @@ from dashboard_api.auth import get_client_any_auth, get_current_client
 from dashboard_api.database import get_db
 
 router = APIRouter(prefix="/api/v1/results", tags=["results"])
+
+_ALLOWED_STATUSES = frozenset({"PASSED", "FAILED", "ERROR", "SKIPPED"})
+_ALLOWED_TYPES = frozenset({
+    "null_check", "duplicate_check", "unique_check", "row_count",
+    "schema_check", "range_check", "relationship_check", "custom_sql",
+})
 
 
 @router.post("", status_code=201)
@@ -20,12 +26,39 @@ def submit_results(
     """
     Called by the backend engine after each test run.
     Accepts a batch of test results and stores them.
+    Phase 2: if batch.run_id is supplied, results are tagged with run_id and
+    the Run.completed_tests counter is incremented (D-06 fidelity).
     """
     run_at = datetime.utcnow()
+
+    if batch.run_id is not None:
+        # Validate run_id belongs to this client (D-24). Reject if cross-client.
+        run = (
+            db.query(models.Run)
+            .filter(models.Run.id == batch.run_id, models.Run.client_id == client.id)
+            .first()
+        )
+        if run is None:
+            raise HTTPException(status_code=404, detail="Run not found")
+    else:
+        # make run path: auto-create a completed Run so results are grouped by run_id.
+        run = models.Run(
+            client_id=client.id,
+            profile=batch.run_profile or "default",
+            type_filter=None,
+            status="COMPLETE",
+            total_tests=len(batch.results),
+            completed_tests=len(batch.results),
+            started_at=run_at,
+            completed_at=run_at,
+        )
+        db.add(run)
+        db.flush()  # assigns run.id before inserting results
 
     for r in batch.results:
         record = models.TestResult(
             client_id=client.id,
+            run_id=run.id,
             test_id=r.test_id,
             test_name=r.name,
             test_type=r.type,
@@ -37,8 +70,11 @@ def submit_results(
         )
         db.add(record)
 
+    if batch.run_id is not None:
+        run.completed_tests = run.completed_tests + len(batch.results)
+
     db.commit()
-    return {"stored": len(batch.results), "run_at": run_at.isoformat()}
+    return {"stored": len(batch.results), "run_at": run_at.isoformat(), "run_id": run.id}
 
 
 @router.get("", response_model=list[schemas.TestResultOut])
@@ -54,6 +90,11 @@ def get_results(
     Accepts API key or JWT. Results are ordered newest first.
     Enriches each result with table/column from the matching TestDefinition config.
     """
+    if status and status.upper() not in _ALLOWED_STATUSES:
+        raise HTTPException(status_code=400, detail=f"Unknown status: {status!r}")
+    if test_type and test_type not in _ALLOWED_TYPES:
+        raise HTTPException(status_code=400, detail=f"Unknown test_type: {test_type!r}")
+
     q = db.query(models.TestResult).filter(models.TestResult.client_id == client.id)
 
     if status:
