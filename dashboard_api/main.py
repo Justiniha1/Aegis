@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -8,6 +10,14 @@ from dashboard_api.routers import auth_routes, clients, profiles, results, runs,
 # Create all tables on startup (no-op if they already exist)
 models.Base.metadata.create_all(bind=engine)
 
+# CORS: read allowed origins from env var; default to localhost:3000 for local dev.
+# Production: set ALLOWED_ORIGINS=https://dashboard.yourdomain.com
+_ALLOWED_ORIGINS = [
+    o.strip()
+    for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+    if o.strip()
+]
+
 app = FastAPI(
     title="DQF Dashboard API",
     description="Receives test results from client backend engines and serves them to the dashboard.",
@@ -17,7 +27,7 @@ app = FastAPI(
 # Allow the Next.js frontend to call the API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=_ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
