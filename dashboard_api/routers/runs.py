@@ -1,4 +1,5 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from dashboard_api.limiter import limiter, RUNS_LIMIT_STRING
 from sqlalchemy.orm import Session
 
 from dashboard_api import models, schemas
@@ -56,7 +57,9 @@ def _compute_total_tests(profile: str, type_filter: list[str] | None, client_id:
 
 
 @router.post("", response_model=schemas.RunTriggerOut, status_code=202)
+@limiter.limit(RUNS_LIMIT_STRING)
 def trigger_run(
+    request: Request,
     body: schemas.RunCreate,
     background_tasks: BackgroundTasks,
     client=Depends(get_client_any_auth),
