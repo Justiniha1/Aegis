@@ -19,6 +19,9 @@ dependencies = [
 aegis = "cli.cli:app"
 
 [project.optional-dependencies]
+airflow = [
+    "apache-airflow>=2.7",
+]
 dev = [
     "pytest>=8.0",
     "pytest-mock>=3.12",
@@ -28,4 +31,4 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["cli*"]
+include = ["cli*", "aegis_dq*"]
