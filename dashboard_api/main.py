@@ -33,7 +33,10 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Allow the Next.js frontend to call the API
+# SlowAPIMiddleware must be added before CORSMiddleware so that CORS (outermost
+# in Starlette's LIFO order) wraps rate-limit responses — otherwise 429s lack
+# Access-Control-Allow-Origin headers and the browser sees a CORS error.
+app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_ALLOWED_ORIGINS,
@@ -41,7 +44,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_middleware(SlowAPIMiddleware)
 
 app.include_router(auth_routes.router)
 app.include_router(results.router)

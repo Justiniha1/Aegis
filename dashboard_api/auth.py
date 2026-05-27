@@ -37,11 +37,17 @@ def get_current_client(
 # ── JWT auth (used by the frontend) ──────────────────────────────────────────
 
 _SECRET = os.getenv("JWT_SECRET_KEY", "")
-if not _SECRET:
+_KNOWN_INSECURE = {"", "change-me-in-production"}
+if _SECRET in _KNOWN_INSECURE:
     import secrets as _s
     _SECRET = _s.token_hex(32)
     import warnings
-    warnings.warn("JWT_SECRET_KEY not set — using random key (tokens won't survive restarts)", stacklevel=1)
+    warnings.warn(
+        "JWT_SECRET_KEY is not set or uses the default placeholder — "
+        "using a random key (tokens won't survive restarts). "
+        "Set a real secret in production.",
+        stacklevel=1,
+    )
 _ALGORITHM = "HS256"
 _EXPIRE_HOURS = 24
 
