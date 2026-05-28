@@ -3,13 +3,12 @@ Aegis DQ — Example Airflow DAG
 ================================
 
 Drop this file into your Airflow DAGs folder.
-Set these three environment variables (or Airflow Variables) on your worker:
+Set these two environment variables (or Airflow Variables) on your worker:
 
-    AEGIS_API_KEY          Your Aegis client API key (from Settings -> API Keys)
-    AEGIS_API_URL          Base URL of the Aegis dashboard API (e.g. http://your-host:8000)
-    AEGIS_ENCRYPTION_KEY   Encryption key for connection profiles (from your Aegis server config)
+    AEGIS_API_KEY   Your Aegis client API key (from Settings -> API Keys)
+    AEGIS_API_URL   Base URL of the Aegis dashboard API (e.g. http://your-host:8000)
 
-No other configuration is required. The DAG will:
+No other configuration is required on the worker. The DAG will:
   1. Trigger a data-quality run against the "production" connection profile
   2. Wait for all checks to complete (polling every 5 seconds)
   3. Fail this task -- and block downstream tasks -- if any check fails
