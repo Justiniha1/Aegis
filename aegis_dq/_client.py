@@ -59,14 +59,37 @@ class AegisAPIClient:
         resp.raise_for_status()
         return resp.json()
 
-    def wait_for_run(self, run_id: int, poll_interval: int = DEFAULT_POLL_INTERVAL) -> dict:
+    def wait_for_run(
+        self,
+        run_id: int,
+        poll_interval: int = DEFAULT_POLL_INTERVAL,
+        max_wait_seconds: int | None = None,
+    ) -> dict:
         """Poll GET /api/v1/runs/{run_id} until status is COMPLETE or FAILED.
 
-        Returns the final run dict.
+        Args:
+            run_id:           Run ID to poll.
+            poll_interval:    Seconds between polls (default: 5).
+            max_wait_seconds: Hard deadline in seconds. Raises TimeoutError
+                              when elapsed time exceeds this value and the run
+                              has not yet reached a terminal state. None = no deadline.
+
+        Returns:
+            The final run dict.
+
+        Raises:
+            TimeoutError: When max_wait_seconds is set and the deadline is exceeded.
         """
+        deadline = (
+            time.monotonic() + max_wait_seconds if max_wait_seconds is not None else None
+        )
         while True:
             run = self.get_run(run_id)
             status = run.get("status")
             if status in ("COMPLETE", "FAILED"):
                 return run
+            if deadline is not None and time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"Run {run_id} did not reach a terminal state within {max_wait_seconds}s"
+                )
             time.sleep(poll_interval)
