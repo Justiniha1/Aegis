@@ -28,7 +28,7 @@
 ### v1.2 First Client Handoff
 
 - [x] **Phase 5: SDK Reliability** — `run_checks()` timeout parameter + operator passthrough (complete 2026-05-27)
-- [ ] **Phase 6: Profile Switcher UI** — Settings page component for selecting active connection profile
+- [x] **Phase 6: Profile Switcher UI** — Settings page component for selecting active connection profile (complete 2026-05-29)
 - [ ] **Phase 7: Railway Deployment** — `railway.toml`, one-click deploy button, post-deploy README checklist
 
 ## Phase Details
@@ -64,8 +64,12 @@ Cross-cutting constraints:
   2. Operator can click a profile to mark it active; the selection is reflected in the run context
   3. A subsequent run trigger from the TopBar uses the selected profile, not a hardcoded default
   4. Active profile selection persists across page navigations within the session
-**Plans**: TBD
-**UI hint**: yes
+**Plans**: 1 plan (1 wave)
+
+Plans:
+
+**Wave 1**
+- [x] 06-01-PLAN.md — Extend RunContext with profilesLoading/profilesError; update settings/page.tsx (opacity, state branches, labels, error copy)
 
 ### Phase 7: Railway Deployment
 **Goal**: Anyone can deploy Aegis to Railway in under 15 minutes using only the README
@@ -88,9 +92,9 @@ Cross-cutting constraints:
 | 3. Package + Airflow | v1.1 | 3/3 | Complete | 2026-05-24 |
 | 4. Production Hardening | v1.1 | 2/2 | Complete | 2026-05-26 |
 | 5. SDK Reliability | v1.2 | 3/3 | Complete | 2026-05-27 |
-| 6. Profile Switcher UI | v1.2 | 0/? | Not started | - |
+| 6. Profile Switcher UI | v1.2 | 1/1 | Complete | 2026-05-29 |
 | 7. Railway Deployment | v1.2 | 0/? | Not started | - |
 
 ---
 *Roadmap created: 2026-05-07*
-*Last updated: 2026-05-27 — Phase 5 planned (3 plans)*
+*Last updated: 2026-05-29 — Phase 6 complete (1/1 plans)*
