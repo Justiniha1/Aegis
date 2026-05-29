@@ -14,7 +14,7 @@ const EMPTY_FORM = { name: "", connection_url: "", db_type: "postgresql" };
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const { token } = useAuth();
-  const { profiles, selectedProfile, setSelectedProfile, refreshProfiles } = useRunContext();
+  const { profiles, selectedProfile, setSelectedProfile, refreshProfiles, profilesLoading, profilesError } = useRunContext();
   const dark = theme === "dark";
   const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
 
@@ -35,7 +35,7 @@ export default function SettingsPage() {
       setShowAddForm(false);
       refreshProfiles();
     } catch (err: unknown) {
-      setFormError(err instanceof Error ? err.message : "Failed to add profile");
+      setFormError(err instanceof Error ? err.message : "Failed to add profile — check your connection URL and try again.");
     } finally {
       setAdding(false);
     }
@@ -93,9 +93,17 @@ export default function SettingsPage() {
           "Run all" runs tests tagged to this profile.
         </p>
 
-        {profiles.length === 0 ? (
+        {profilesLoading ? (
           <p className="text-body" style={{ color: palette.textSecondary }}>
-            No environments found — check your database_connection.yaml.
+            Loading profiles…
+          </p>
+        ) : profilesError ? (
+          <p className="text-body" style={{ color: STATUS_PALETTE.FAILED }}>
+            Could not load profiles — check your connection and reload.
+          </p>
+        ) : profiles.length === 0 ? (
+          <p className="text-body" style={{ color: palette.textSecondary }}>
+            No environments found — add a profile to get started.
           </p>
         ) : (
           <div className="space-y-1">
@@ -110,15 +118,15 @@ export default function SettingsPage() {
                   style={{
                     borderRadius: "6px",
                     backgroundColor: active ? `${BRAND_TEAL}0F` : "transparent",
-                    opacity: active ? 1 : 0.45,
+                    opacity: active ? 1 : 0.75,
                     cursor: "pointer",
                     border: "none",
                   }}
                   onMouseEnter={(e) => {
-                    if (!active) (e.currentTarget as HTMLButtonElement).style.opacity = "0.75";
+                    if (!active) (e.currentTarget as HTMLButtonElement).style.opacity = "0.90";
                   }}
                   onMouseLeave={(e) => {
-                    if (!active) (e.currentTarget as HTMLButtonElement).style.opacity = "0.45";
+                    if (!active) (e.currentTarget as HTMLButtonElement).style.opacity = "0.75";
                   }}
                 >
                   <div
@@ -344,7 +352,7 @@ export default function SettingsPage() {
                   fontWeight: 500,
                 }}
               >
-                {adding ? "Saving…" : "Save"}
+                {adding ? "Saving changes…" : "Save Changes"}
               </button>
               <button
                 type="button"

@@ -20,6 +20,8 @@ type RunCtx = {
   lastCompleted: number;
   passingCount: number;
   warningCount: number;
+  profilesLoading: boolean;
+  profilesError: string | null;
 };
 
 const RunContext = createContext<RunCtx | null>(null);
@@ -37,6 +39,8 @@ export function RunProvider({ children }: { children: React.ReactNode }) {
   const [lastCompleted, setLastCompleted] = useState(0);
   const [passingCount, setPassingCount] = useState(0);
   const [warningCount, setWarningCount] = useState(0);
+  const [profilesLoading, setProfilesLoading] = useState(true);
+  const [profilesError, setProfilesError] = useState<string | null>(null);
   const runStatusRef = useRef<RunStatus | null>(null);
   const isTriggeringRef = useRef(false);
   runStatusRef.current = runStatus;
@@ -48,12 +52,18 @@ export function RunProvider({ children }: { children: React.ReactNode }) {
 
   const loadProfiles = useCallback(() => {
     if (!token) return;
+    setProfilesLoading(true);
+    setProfilesError(null);
     listProfiles(token).then((p) => {
       setProfiles(p);
       if (!localStorage.getItem(PROFILE_STORAGE_KEY) && p.length > 0) {
         setSelectedProfile(p[0].name);
       }
-    }).catch(() => {});
+      setProfilesLoading(false);
+    }).catch((err: unknown) => {
+      setProfilesError(err instanceof Error ? err.message : "Failed to load profiles");
+      setProfilesLoading(false);
+    });
   }, [token, setSelectedProfile]);
 
   useEffect(() => {
@@ -116,7 +126,9 @@ export function RunProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <RunContext.Provider
-      value={{ profiles, selectedProfile, setSelectedProfile, refreshProfiles: loadProfiles, runId, runStatus, runError, isTriggering, trigger, lastCompleted, passingCount, warningCount }}
+      value={{ profiles, selectedProfile, setSelectedProfile, refreshProfiles: loadProfiles,
+               profilesLoading, profilesError,
+               runId, runStatus, runError, isTriggering, trigger, lastCompleted, passingCount, warningCount }}
     >
       {children}
     </RunContext.Provider>
