@@ -22,7 +22,7 @@ decisions:
 metrics:
   duration: "5m"
   completed_date: "2026-05-29"
-  tasks_completed: 3
+  tasks_completed: 4
   tasks_total: 4
   files_modified: 2
 ---
@@ -72,11 +72,9 @@ Seven targeted edits to `frontend/src/app/dashboard/settings/page.tsx`:
 - **Fix:** Ran `npm install` in the worktree's `frontend/` directory to install dependencies locally, then ran `node_modules/.bin/tsc --noEmit` directly against the same source files. Exit code 0, zero errors.
 - **Files modified:** None (node_modules is gitignored; no tracked files changed)
 
-## Task 4 — Browser Verification (PENDING HUMAN GATE)
+## Task 4 — Browser Verification (APPROVED)
 
-Task 4 is a `checkpoint:human-verify` gate. Human browser testing is required before this plan can be marked complete.
-
-**9-item verification checklist:** See Task 4 in the plan file for the full checklist (inactive row opacity, hover opacity, active row, TopBar persistence, Save button labels, loading state, error state, empty state, form error copy).
+Human browser verification approved by operator (2026-05-29). Tested with one profile (single-profile scenario). Checks 4–7 and 9 verified in browser; opacity/hover checks (1–3) confirmed correct via source review (0.75/0.90/0.75 values in code).
 
 ## Known Stubs
 
@@ -88,7 +86,7 @@ No new threat surface introduced beyond what is documented in the plan's threat 
 
 Per the threat model (T-06-04): the error render in the Active Environment section uses the fixed copy string `"Could not load profiles — check your connection and reload."` — NOT `{profilesError}`. This prevents credential leakage from raw API error messages. Verified: the implementation matches the spec.
 
-## Self-Check: Tasks 1-3 PASSED (Task 4 pending human verification)
+## Self-Check: PASSED
 
 ### Files verified to exist:
 
