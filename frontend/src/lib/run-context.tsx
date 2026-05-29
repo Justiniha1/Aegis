@@ -56,8 +56,12 @@ export function RunProvider({ children }: { children: React.ReactNode }) {
     setProfilesError(null);
     listProfiles(token).then((p) => {
       setProfiles(p);
-      if (!localStorage.getItem(PROFILE_STORAGE_KEY) && p.length > 0) {
+      const storedName = typeof window !== "undefined" ? localStorage.getItem(PROFILE_STORAGE_KEY) : null;
+      if (!storedName && p.length > 0) {
         setSelectedProfile(p[0].name);
+      } else if (storedName && !p.find((prof) => prof.name === storedName)) {
+        setSelectedProfileState(null);
+        if (typeof window !== "undefined") localStorage.removeItem(PROFILE_STORAGE_KEY);
       }
       setProfilesLoading(false);
     }).catch((err: unknown) => {
@@ -74,12 +78,13 @@ export function RunProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!token) return;
     apiGet("/api/v1/results?limit=500", token)
-      .then((results: TestResult[]) => {
-        if (results.length === 0) return;
-        const latestRunId = results[0].run_id;
+      .then((results: unknown) => {
+        if (!Array.isArray(results) || results.length === 0) return;
+        const typedResults = results as TestResult[];
+        const latestRunId = typedResults[0].run_id;
         const latest = latestRunId != null
-          ? results.filter((r) => r.run_id === latestRunId)
-          : results.filter((r) => r.run_at === results[0].run_at);
+          ? typedResults.filter((r) => r.run_id === latestRunId)
+          : typedResults.filter((r) => r.run_at === typedResults[0].run_at);
         setPassingCount(latest.filter((r) => r.status === "PASSED").length);
         setWarningCount(latest.filter((r) => r.status !== "PASSED").length);
       })
@@ -112,6 +117,7 @@ export function RunProvider({ children }: { children: React.ReactNode }) {
     isTriggeringRef.current = true;
     setIsTriggering(true);
     setRunError(null);
+    setRunStatus(null);
     try {
       const res = await apiTriggerRun(selectedProfile, null, token);
       setRunId(res.run_id);

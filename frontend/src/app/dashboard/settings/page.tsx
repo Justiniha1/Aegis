@@ -47,8 +47,8 @@ export default function SettingsPage() {
     try {
       await deleteProfile(id, token);
       refreshProfiles();
-    } catch {
-      // ignore
+    } catch (err: unknown) {
+      setFormError(err instanceof Error ? err.message : "Failed to remove profile — try again.");
     } finally {
       setDeletingId(null);
     }
@@ -149,18 +149,6 @@ export default function SettingsPage() {
                   >
                     {p.name}
                   </span>
-                  {profiles[0]?.name === p.name && profiles.length > 1 && (
-                    <span
-                      className="text-[10px] px-1.5 py-0.5 rounded font-semibold"
-                      style={{
-                        backgroundColor: `${BRAND_TEAL}1A`,
-                        color: BRAND_TEAL,
-                        opacity: 1,
-                      }}
-                    >
-                      default
-                    </span>
-                  )}
                 </button>
               );
             })}
@@ -547,14 +535,12 @@ function ToggleRow({
   enabled,
   disabled,
   theme,
-  onChange,
 }: {
   label: string;
   description: string;
   enabled: boolean;
   disabled?: boolean;
   theme: string;
-  onChange?: (v: boolean) => void;
 }) {
   const dark = theme === "dark";
   const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
@@ -579,7 +565,6 @@ function ToggleRow({
       </div>
       <button
         disabled={disabled}
-        onClick={() => onChange?.(!enabled)}
         className="relative transition-colors"
         style={{
           width: "40px",
