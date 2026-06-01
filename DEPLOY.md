@@ -48,7 +48,15 @@ reads the correct `railway.toml`:
 | `engine`   | `backend/`     | `backend/railway.toml` → `Dockerfile` (idle) |
 
 Setting each service's **Root Directory** (and config file path) is a one-time
-per-service dashboard setting.
+per-service dashboard setting. Once Root Directory is set, Railway auto-detects
+that folder's `railway.toml` and the **Build → Builder** will switch to
+`Dockerfile` on the next deploy. (If it stays on Railpack, set **Settings →
+Config-as-code → Add File Path = `railway.toml`** to force it.)
+
+> **Name the `api` service exactly `api`.** Railway auto-creates the first service
+> from your repo name (e.g. `aegis`). Either rename it to `api` here, or be ready to
+> use the **literal** API domain in step 4 — the cross-service reference variable
+> `${{api.RAILWAY_PUBLIC_DOMAIN}}` only resolves if a service is literally named `api`.
 
 ---
 
@@ -78,6 +86,7 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 | Variable | Value | Notes |
 |----------|-------|-------|
 | `NEXT_PUBLIC_API_URL` | _see step 4_ | Build-time variable. Do **not** set it yet — the API domain must exist first. |
+| `PORT` | `3000` | Pin the port. Next.js (`next start`) listens on 3000; without this you may get **"Application failed to respond"** because Railway's domain routes to a different port. Make sure the frontend domain's **target port is also 3000** (see step 4). |
 
 ### `engine` service
 
@@ -88,21 +97,36 @@ production engines run on the client's own infrastructure (see the checklist).
 
 ## 4. Deploy the API and wire the frontend URL (two-step)
 
-`NEXT_PUBLIC_API_URL` is baked into the frontend at **build time**, and reference
-variables resolve to an empty string before the API domain exists. So the order
-matters (D-03):
+`NEXT_PUBLIC_API_URL` is compiled into the frontend's JavaScript at **build time**
+(the Dockerfile bakes it via `ARG`/`ENV` before `npm run build`). So the API must
+have a domain *before* the frontend builds, and any change to this value requires a
+**full rebuild** — not just a restart. Order matters (D-03):
 
-1. **Deploy the `api` service.**
-2. Generate its public domain: **Settings → Networking → Generate Domain**.
-3. On the `frontend` service, set the build-time variable:
+1. **Deploy the `api` service.** (If the API healthcheck fails, the start command
+   must run through a shell so `$PORT` expands — the repo's root `railway.toml`
+   already wraps it in `sh -c '...'`.)
+2. Generate its public domain: **api → Settings → Networking → Generate Domain**
+   (enter `8080` if asked for a port). **Copy the domain** — e.g.
+   `aegis-production-fa56.up.railway.app`.
+3. On the `frontend` service → **Variables**, set the build-time variable to the
+   **literal API domain** you just copied (recommended — works regardless of service name):
    ```
-   NEXT_PUBLIC_API_URL=https://${{api.RAILWAY_PUBLIC_DOMAIN}}
+   NEXT_PUBLIC_API_URL=https://aegis-production-fa56.up.railway.app
    ```
-   The `https://` prefix is **required** — Railway returns the bare domain without a scheme.
-4. **Deploy the `frontend` service.** The build ARG now resolves because the API domain exists.
+   - **No trailing slash** — the app builds requests as `${NEXT_PUBLIC_API_URL}/api/v1/...`.
+   - The `https://` prefix is **required**.
+   - *Alternative:* if (and only if) your API service is named exactly `api`, you may
+     instead use the reference variable `https://${{api.RAILWAY_PUBLIC_DOMAIN}}`.
+4. **Generate the frontend domain:** **frontend → Settings → Networking → Generate
+   Domain**, and set its **target port to `3000`** (matches the `PORT=3000` from step 3).
+   Copy this domain — it's your dashboard URL.
+5. **Deploy / redeploy the `frontend` service** so it rebuilds with the API URL baked in.
+   Wait for green, then **hard-refresh** the page (Ctrl+Shift+R) to clear cached JS.
 
-> **Fallback:** if the reference variable resolves empty at build, hardcode
-> `NEXT_PUBLIC_API_URL=https://<api-domain>.railway.app` on the frontend and redeploy.
+> **If login later says "Can't reach the server" with `ERR_NAME_NOT_RESOLVED` in the
+> browser console (F12 → Network → the `login` request → Request URL):** the frontend
+> baked a bad/old `NEXT_PUBLIC_API_URL`. Fix the variable to the literal API domain and
+> **redeploy the frontend again** (a full rebuild) — then hard-refresh.
 
 ---
 
@@ -136,6 +160,13 @@ Run these against the live instance:
    curl -X POST https://<api>.railway.app/api/v1/clients \
      -H "Content-Type: application/json" \
      -d '{"name":"owner","email":"owner@example.com","password":"<strong-password>"}'
+   ```
+   **On Windows PowerShell**, `curl` is an alias for `Invoke-WebRequest` and rejects
+   `-H`/`-d`. Use `Invoke-RestMethod` with a single-quoted body instead (no escaping):
+   ```powershell
+   $body = '{"name":"owner","email":"owner@example.com","password":"<strong-password>"}'
+   $resp = Invoke-RestMethod -Uri "https://<api>.railway.app/api/v1/clients" -Method Post -ContentType "application/json" -Body $body
+   $resp | ConvertTo-Json
    ```
    **Save the `api_key`** from the `201` response — it is **shown once only** and is
    the `DQF_API_KEY` your Airflow worker will need.
