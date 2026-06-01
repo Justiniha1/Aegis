@@ -1,0 +1,11 @@
+# Railway config for the Aegis api service (build context = repo root).
+# Postgres is provisioned separately via the Railway dashboard.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "dashboard_api/Dockerfile"
+
+[deploy]
+startCommand = "uvicorn dashboard_api.main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/api/v1/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"

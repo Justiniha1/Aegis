@@ -29,7 +29,7 @@
 
 - [x] **Phase 5: SDK Reliability** — `run_checks()` timeout parameter + operator passthrough (complete 2026-05-27)
 - [x] **Phase 6: Profile Switcher UI** — Settings page component for selecting active connection profile (complete 2026-05-29)
-- [ ] **Phase 7: Railway Deployment** — `railway.toml`, one-click deploy button, post-deploy README checklist
+- [ ] **Phase 7: Railway Deployment** — `railway.toml`, README deploy runbook, post-deploy checklist
 
 ## Phase Details
 
@@ -72,15 +72,23 @@ Plans:
 - [x] 06-01-PLAN.md — Extend RunContext with profilesLoading/profilesError; update settings/page.tsx (opacity, state branches, labels, error copy)
 
 ### Phase 7: Railway Deployment
-**Goal**: Anyone can deploy Aegis to Railway in under 15 minutes using only the README
-**Depends on**: Phase 5, Phase 6 (all v1.2 features complete before public handoff)
+**Goal**: The project owner can deploy Aegis to Railway in under 15 minutes by following the README runbook
+**Depends on**: Phase 5, Phase 6 (all v1.2 features complete before owner handoff)
 **Requirements**: DEPLOY-03, DEPLOY-04, DEPLOY-05
 **Success Criteria** (what must be TRUE):
-  1. Clicking the "Deploy on Railway" button in the README starts a Railway project with `api`, `frontend`, and `engine` services pre-configured — no code changes required
+  1. Following the README runbook, `railway.toml` provisions a Railway project with `api`, `frontend`, and `engine` services pre-configured — no code changes required (no public one-click button; reduced per D-07)
   2. After setting the documented env vars, `https://<project>.railway.app` serves the Aegis dashboard login page
   3. `railway.toml` correctly specifies Dockerfile paths, start commands, and port bindings for all three services
   4. The README post-deploy checklist covers: required env vars, creating the first client account, and pointing an Airflow worker at the live API URL
-**Plans**: TBD
+**Plans**: 2 plans (2 waves)
+
+Plans:
+
+**Wave 1**
+- [ ] 07-01-PLAN.md — Add psycopg2-binary to api requirements + write the three per-service railway.toml (api/frontend/engine)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 07-02-PLAN.md — Write DEPLOY.md runbook (provisioning, env vars, two-step URL wiring, post-deploy checklist) + link it from README.md
 
 ## Progress
 
@@ -93,8 +101,8 @@ Plans:
 | 4. Production Hardening | v1.1 | 2/2 | Complete | 2026-05-26 |
 | 5. SDK Reliability | v1.2 | 3/3 | Complete | 2026-05-27 |
 | 6. Profile Switcher UI | v1.2 | 1/1 | Complete | 2026-05-29 |
-| 7. Railway Deployment | v1.2 | 0/? | Not started | - |
+| 7. Railway Deployment | v1.2 | 0/2 | Planned | - |
 
 ---
 *Roadmap created: 2026-05-07*
-*Last updated: 2026-05-29 — Phase 6 complete (1/1 plans)*
+*Last updated: 2026-05-29 — Phase 7 planned (2 plans, 2 waves)*

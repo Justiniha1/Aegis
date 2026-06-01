@@ -70,6 +70,12 @@ Results appear on the dashboard at http://localhost:3000.
 
 ---
 
+## Deploy to Railway
+
+To host Aegis on Railway (managed Postgres + `api` + `frontend`, with the `engine` idle), follow the step-by-step runbook in [DEPLOY.md](DEPLOY.md). It covers provisioning the database, setting the required environment variables, creating your first account, and pointing an Airflow worker at the live API.
+
+---
+
 ## Commands
 
 | Command | Description |

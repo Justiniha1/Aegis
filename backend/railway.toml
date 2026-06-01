@@ -1,0 +1,10 @@
+# Railway config for the Aegis engine service.
+# Ships IDLE per D-04 — production engines run on the client's own infra
+# pointed at the live API. sleep infinity keeps the container alive without
+# running checks and without crash-looping.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "sleep infinity"
