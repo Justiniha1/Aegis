@@ -1,13 +1,11 @@
-import os
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from cryptography.fernet import Fernet
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from dashboard_api.models import Base, Client, Run, ConnectionProfile
 from dashboard_api.auth import hash_key
-from dashboard_api.encryption import encrypt
 
 
 @pytest.fixture()
@@ -32,8 +30,8 @@ def db_session(monkeypatch, tmp_path):
     profile = ConnectionProfile(
         client_id=client.id,
         name="dev",
-        connection_url_encrypted=encrypt("sqlite:///:memory:"),
         db_type="sqlite",
+        sqlite_path=":memory:",
     )
     db.add(profile)
     db.commit()
@@ -73,8 +71,8 @@ def test_execute_run_fails_when_no_connection_profile(monkeypatch, tmp_path):
     db2.close()
 
 
-def test_execute_run_fails_when_decrypt_fails(monkeypatch, tmp_path):
-    """Run should transition to FAILED if ConnectionProfile has invalid encrypted data."""
+def test_execute_run_fails_when_connection_build_fails(monkeypatch, tmp_path):
+    """Run should transition to FAILED if the stored secret cannot be decrypted."""
     monkeypatch.setenv("AEGIS_ENCRYPTION_KEY", Fernet.generate_key().decode())
     monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-32-chars-xxxxxxxxxxxxx")
     engine = create_engine(f"sqlite:///{tmp_path}/badencrypt.db", connect_args={"check_same_thread": False})
@@ -93,8 +91,10 @@ def test_execute_run_fails_when_decrypt_fails(monkeypatch, tmp_path):
     profile = ConnectionProfile(
         client_id=client.id,
         name="broken",
-        connection_url_encrypted="not-valid-fernet-data",
-        db_type="sqlite",
+        db_type="postgresql",
+        host="h",
+        username="u",
+        secret_encrypted="not-valid-fernet-data",
     )
     db.add(profile)
     db.commit()
@@ -109,5 +109,5 @@ def test_execute_run_fails_when_decrypt_fails(monkeypatch, tmp_path):
     db2 = Session()
     updated = db2.query(Run).filter(Run.id == run_id).first()
     assert updated.status == "FAILED"
-    assert "Could not decrypt" in updated.error_reason
+    assert "Could not build connection" in updated.error_reason
     db2.close()

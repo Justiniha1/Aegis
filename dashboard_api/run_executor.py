@@ -98,6 +98,7 @@ def execute_run(
     )
     from backend.core.test_engine import TestEngine
     from dashboard_api.encryption import decrypt
+    from dashboard_api.profile_url import build_connection_url
 
     db = SessionLocal()
     try:
@@ -125,10 +126,13 @@ def execute_run(
             return
 
         try:
-            connection_url = decrypt(conn_row.connection_url_encrypted)
+            secret = decrypt(conn_row.secret_encrypted) if conn_row.secret_encrypted else None
+            connection_url = build_connection_url(conn_row, secret)
         except Exception as e:
             run.status = "FAILED"
-            run.error_reason = _sanitize_error(f"Could not decrypt profile '{profile}': {e}")
+            run.error_reason = _sanitize_error(
+                f"Could not build connection for profile '{profile}': {e}"
+            )
             run.completed_at = datetime.utcnow()
             db.commit()
             return
