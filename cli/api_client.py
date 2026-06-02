@@ -21,11 +21,3 @@ class AegisClient:
         resp.raise_for_status()
         return resp.text
 
-    def put(self, path: str, json: dict = None, **kwargs) -> dict:
-        resp = requests.put(f"{self._base}{path}", json=json, headers=self._headers, timeout=15, **kwargs)
-        resp.raise_for_status()
-        return resp.json()
-
-    def delete(self, path: str, **kwargs) -> None:
-        resp = requests.delete(f"{self._base}{path}", headers=self._headers, timeout=15, **kwargs)
-        resp.raise_for_status()

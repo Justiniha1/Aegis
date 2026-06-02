@@ -174,7 +174,17 @@ Run these against the live instance:
 3. **Confirm login:** open `https://<frontend>.railway.app`, log in with that
    email/password. The dashboard should load with **no console CORS errors**.
 
-4. **Point an Airflow worker at the live API.** The engine runs on the client's own
+4. **Seed test definitions and connection profiles.** In your local project directory
+   (where `aegis/` lives), run:
+   ```bash
+   aegis init   # if you haven't already scaffolded the project
+   aegis push   # uploads aegis/test_definitions.yaml and aegis/database_connection.yaml
+   ```
+   This populates the dashboard's **Active Environment** selector with your connection
+   profile names and makes test definitions available for runs. Without this step the
+   profile dropdown will be empty.
+
+5. **Point an Airflow worker at the live API.** The engine runs on the client's own
    infra (D-04). In the Airflow environment / `.env` used by the `aegis-dq` SDK, set:
    ```
    AEGIS_API_URL=https://<api>.railway.app

@@ -6,7 +6,7 @@ from dashboard_api import models, schemas
 from dashboard_api.auth import get_client_any_auth
 from dashboard_api.database import get_db
 from dashboard_api.run_executor import execute_run
-from dashboard_api import profile_loader
+from dashboard_api import connection_source
 
 router = APIRouter(prefix="/api/v1/runs", tags=["runs"])
 
@@ -78,9 +78,10 @@ def trigger_run(
     - Zero matching enabled tests -> 400 with `Couldn't start — no enabled tests for profile {name}`
     - Active run exists -> 409 `A run is already in progress` (D-09 defense-in-depth)
     """
-    # Validate profile against the connection YAML.
-    known_names, _ = profile_loader.load_profile_names()
-    if body.profile not in known_names:
+    # Validate profile against the connection YAML (uploaded or on-disk, per client).
+    yaml_text = connection_source.get_yaml_text(db, client.id)
+    available, _default = connection_source.profile_names(yaml_text)
+    if body.profile not in available:
         raise HTTPException(
             status_code=400,
             detail=f"Couldn't start — profile '{body.profile}' not found in connection config",
