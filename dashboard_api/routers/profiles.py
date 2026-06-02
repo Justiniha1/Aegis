@@ -9,29 +9,52 @@ from dashboard_api.encryption import encrypt
 
 router = APIRouter(prefix="/api/v1/profiles", tags=["profiles"])
 
+# Fields copied straight from create/update bodies onto the model row.
+_STRUCT_FIELDS = ("db_type", "host", "port", "database", "username", "sqlite_path", "secret_env")
+
+
+def _default_secret_env(name: str) -> str:
+    safe = "".join(ch if ch.isalnum() else "_" for ch in name).upper()
+    return f"AEGIS_{safe}_PASSWORD"
+
 
 @router.post("", response_model=schemas.ConnectionProfileOut, status_code=201)
-def create_profile(
+def upsert_profile(
     body: schemas.ConnectionProfileCreate,
     db: Session = Depends(get_db),
     client: models.Client = Depends(get_client_any_auth),
 ):
-    existing = db.query(models.ConnectionProfile).filter(
+    """Create or update a profile by (client_id, name). Upsert so `aegis push` is idempotent.
+
+    Secret handling (no-clobber): if secret_value is provided it is encrypted and stored;
+    if omitted, any existing secret is preserved.
+    """
+    row = db.query(models.ConnectionProfile).filter(
         models.ConnectionProfile.client_id == client.id,
         models.ConnectionProfile.name == body.name,
     ).first()
-    if existing:
-        raise HTTPException(status_code=409, detail=f"Profile '{body.name}' already exists")
-    profile = models.ConnectionProfile(
-        client_id=client.id,
-        name=body.name,
-        connection_url_encrypted=encrypt(body.connection_url),
-        db_type=body.db_type,
-    )
-    db.add(profile)
+
+    is_new = row is None
+    if is_new:
+        row = models.ConnectionProfile(client_id=client.id, name=body.name)
+
+    for f in _STRUCT_FIELDS:
+        setattr(row, f, getattr(body, f))
+
+    # Secretless dbs (sqlite) carry no secret_env.
+    if (row.db_type or "").lower() == "sqlite":
+        row.secret_env = None
+    elif row.secret_env is None:
+        row.secret_env = _default_secret_env(body.name)
+
+    if body.secret_value is not None:
+        row.secret_encrypted = encrypt(body.secret_value)
+
+    if is_new:
+        db.add(row)
     db.commit()
-    db.refresh(profile)
-    return profile
+    db.refresh(row)
+    return row
 
 
 @router.get("", response_model=list[schemas.ConnectionProfileOut])
@@ -41,7 +64,37 @@ def list_profiles(
 ):
     return db.query(models.ConnectionProfile).filter(
         models.ConnectionProfile.client_id == client.id
-    ).all()
+    ).order_by(models.ConnectionProfile.name.asc()).all()
+
+
+@router.put("/{profile_id}", response_model=schemas.ConnectionProfileOut)
+def update_profile(
+    profile_id: int,
+    body: schemas.ConnectionProfileUpdate,
+    db: Session = Depends(get_db),
+    client: models.Client = Depends(get_client_any_auth),
+):
+    row = db.query(models.ConnectionProfile).filter(
+        models.ConnectionProfile.id == profile_id,
+        models.ConnectionProfile.client_id == client.id,
+    ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    for f in _STRUCT_FIELDS:
+        val = getattr(body, f)
+        if val is not None:
+            setattr(row, f, val)
+
+    if (row.db_type or "").lower() == "sqlite":
+        row.secret_env = None
+
+    if body.secret_value is not None:          # no-clobber: only overwrite when supplied
+        row.secret_encrypted = encrypt(body.secret_value)
+
+    db.commit()
+    db.refresh(row)
+    return row
 
 
 @router.delete("/{profile_id}", status_code=204)
@@ -50,12 +103,12 @@ def delete_profile(
     db: Session = Depends(get_db),
     client: models.Client = Depends(get_client_any_auth),
 ):
-    profile = db.query(models.ConnectionProfile).filter(
+    row = db.query(models.ConnectionProfile).filter(
         models.ConnectionProfile.id == profile_id,
         models.ConnectionProfile.client_id == client.id,
     ).first()
-    if not profile:
+    if not row:
         raise HTTPException(status_code=404, detail="Profile not found")
-    db.delete(profile)
+    db.delete(row)
     db.commit()
     return Response(status_code=204)
