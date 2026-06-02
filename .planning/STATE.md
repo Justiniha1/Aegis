@@ -76,7 +76,7 @@ Resume file: none
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| Phase 8 | Browser UAT of selector-only Settings | Pending user confirmation | 2026-06-01 |
+| Phase 8 | Browser UAT of selector-only Settings | ✅ PASSED 2026-06-02 (Playwright: 4 profiles listed, 0 CRUD controls, selection persists, run uses selected profile) | 2026-06-01 |
 | Phase 8 | Untracked `aegis/` scaffold in working tree | Local working files (from `aegis init`); not for commit | 2026-06-01 |
 | Phase 2 | Per-row / per-table run triggers | v1.3 candidate | 2026-05-22 |
 | Phase 3 | PyPI publish (PKG-02) | v1.3 candidate | 2026-05-26 |
