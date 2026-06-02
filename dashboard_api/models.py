@@ -18,7 +18,6 @@ class Client(Base):
 
     results = relationship("TestResult", back_populates="client")
     test_definitions = relationship("TestDefinition", back_populates="client", cascade="all, delete-orphan")
-    connection_profiles = relationship("ConnectionProfile", cascade="all, delete-orphan")
 
 
 class Run(Base):
@@ -76,32 +75,3 @@ class TestDefinition(Base):
     updated_at = Column(DateTime, default=datetime.utcnow)
 
     client = relationship("Client", back_populates="test_definitions")
-
-
-class ConnectionProfile(Base):
-    __tablename__ = "connection_profiles"
-
-    id = Column(Integer, primary_key=True)
-    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False, index=True)
-    name = Column(String, nullable=False)          # e.g. "production", "dev"
-    db_type = Column(String, nullable=False)       # "postgresql" | "mysql" | "sqlite" | "mssql"
-
-    # Structure (non-secret) — returned by the API, written into local YAML.
-    host = Column(String, nullable=True)
-    port = Column(Integer, nullable=True)
-    database = Column(String, nullable=True)
-    username = Column(String, nullable=True)
-    sqlite_path = Column(String, nullable=True)
-
-    # secret_env: the env var NAME holding this profile's secret (non-secret label).
-    # Null for secretless profiles (e.g. SQLite). Returned by the API.
-    secret_env = Column(String, nullable=True)
-    # secret_encrypted: the secret VALUE, encrypted; used only for server-side runs.
-    # NEVER returned by any endpoint. Null until a secret is supplied.
-    secret_encrypted = Column(String, nullable=True)
-
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    __table_args__ = (
-        Index("ix_profiles_client_name", "client_id", "name", unique=True),
-    )

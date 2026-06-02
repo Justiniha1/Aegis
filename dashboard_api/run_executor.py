@@ -97,8 +97,8 @@ def execute_run(
         _name_to_id, _deduplicate_test_ids,
     )
     from backend.core.test_engine import TestEngine
-    from dashboard_api.encryption import decrypt
-    from dashboard_api.profile_url import build_connection_url
+    from backend.core.config_loader import _load_yaml, _resolve_env_vars
+    from dashboard_api.profile_loader import _resolve_path
 
     db = SessionLocal()
     try:
@@ -110,34 +110,24 @@ def execute_run(
         run.status = "RUNNING"
         db.commit()
 
-        # Load connection profile from DB (replaces local YAML lookup)
-        conn_row = db.query(models.ConnectionProfile).filter(
-            models.ConnectionProfile.client_id == client_id,
-            models.ConnectionProfile.name == profile,
-        ).first()
-
-        if conn_row is None:
-            run.status = "FAILED"
-            run.error_reason = _sanitize_error(
-                f"Profile '{profile}' not found — add it in Settings → Connection Profiles"
-            )
-            run.completed_at = datetime.utcnow()
-            db.commit()
-            return
-
+        # Resolve the connection from the connection YAML — the same file the engine
+        # uses. We pass the raw profile dict through; the engine's DatabaseConnector
+        # resolves relative SQLite paths (against the config dir) and connection_url.
         try:
-            secret = decrypt(conn_row.secret_encrypted) if conn_row.secret_encrypted else None
-            connection_url = build_connection_url(conn_row, secret)
-        except Exception as e:
+            raw_conns = _resolve_env_vars(_load_yaml(_resolve_path()))
+        except Exception:
+            raw_conns = {}
+        prof = raw_conns.get(profile)
+        if not isinstance(prof, dict):
             run.status = "FAILED"
             run.error_reason = _sanitize_error(
-                f"Could not build connection for profile '{profile}': {e}"
+                f"Profile '{profile}' not found in connection config"
             )
             run.completed_at = datetime.utcnow()
             db.commit()
             return
 
-        connections = {profile: {"connection_url": connection_url}}
+        connections = {profile: prof}
         engine_cfg = EngineConfig(
             engine="simple",
             default_profile=profile,
