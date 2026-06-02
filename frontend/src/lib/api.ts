@@ -68,31 +68,3 @@ export async function listRuns(limit: number, token: string): Promise<Run[]> {
 export async function listProfiles(token: string): Promise<ProfileOut[]> {
   return apiGet("/api/v1/profiles", token) as Promise<ProfileOut[]>;
 }
-
-export interface ProfileInput {
-  name: string;
-  db_type: string;
-  host?: string | null;
-  port?: number | null;
-  database?: string | null;
-  username?: string | null;
-  sqlite_path?: string | null;
-  secret_env?: string | null;
-  secret_value?: string | null;
-}
-
-export async function createProfile(body: ProfileInput, token: string): Promise<ProfileOut> {
-  return apiPost("/api/v1/profiles", body, token) as Promise<ProfileOut>;
-}
-
-export async function updateProfile(
-  id: number,
-  body: Partial<ProfileInput>,
-  token: string,
-): Promise<ProfileOut> {
-  return apiPut(`/api/v1/profiles/${id}`, body, token) as Promise<ProfileOut>;
-}
-
-export async function deleteProfile(id: number, token: string): Promise<void> {
-  await apiDelete(`/api/v1/profiles/${id}`, token);
-}
