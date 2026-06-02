@@ -52,7 +52,7 @@ export default function SettingsPage() {
         database: isSqlite ? null : form.database || null,
         username: isSqlite ? null : form.username || null,
         sqlite_path: isSqlite ? form.sqlite_path || null : null,
-        secret_env: isSqlite ? null : effectiveSecretEnv,
+        secret_env: isSqlite ? null : (effectiveSecretEnv || null),
         secret_value: isSqlite || !form.secret_value ? null : form.secret_value,
       };
       await createProfile(payload, token);
@@ -399,7 +399,7 @@ export default function SettingsPage() {
                       {adding ? "Saving…" : "Save Changes"}
                     </button>
                     <button type="button"
-                      onClick={() => { setShowAddForm(false); setForm({ ...EMPTY_FORM }); setSecretEnvTouched(false); setFormError(null); }}
+                      onClick={() => { setShowAddForm(false); setForm({ ...EMPTY_FORM }); setSecretEnvTouched(false); setFormError(null); setCreatedInfo(null); }}
                       style={{ padding: "6px 16px", borderRadius: "6px", backgroundColor: "transparent",
                         color: palette.textSecondary, border: `1px solid ${palette.borderSubtle}`,
                         cursor: "pointer", fontSize: "13px" }}>
