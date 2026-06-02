@@ -1,14 +1,44 @@
-from fastapi import APIRouter, Depends
+from datetime import datetime
 
-from dashboard_api import models, schemas
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from dashboard_api import models, schemas, connection_source
 from dashboard_api.auth import get_client_any_auth
-from dashboard_api import profile_loader
+from dashboard_api.database import get_db
 
 router = APIRouter(prefix="/api/v1/profiles", tags=["profiles"])
 
 
 @router.get("", response_model=list[schemas.ProfileOut])
-def list_profiles(client: models.Client = Depends(get_client_any_auth)):
-    """List connection profile NAMES from the connection YAML (names only — never secrets)."""
-    names, default = profile_loader.load_profile_names()
+def list_profiles(
+    db: Session = Depends(get_db),
+    client: models.Client = Depends(get_client_any_auth),
+):
+    """List connection profile NAMES (never secrets) from the uploaded or on-disk YAML."""
+    yaml_text = connection_source.get_yaml_text(db, client.id)
+    names, default = connection_source.profile_names(yaml_text)
     return [schemas.ProfileOut(name=n, is_default=(n == default)) for n in names]
+
+
+@router.post("/sync")
+def sync_profiles(
+    body: schemas.YamlImport,
+    db: Session = Depends(get_db),
+    client: models.Client = Depends(get_client_any_auth),
+):
+    """Upload the local database_connection.yaml. Stored per client; preferred over the on-disk file."""
+    row = (
+        db.query(models.ConnectionConfig)
+        .filter(models.ConnectionConfig.client_id == client.id)
+        .first()
+    )
+    if row is None:
+        row = models.ConnectionConfig(client_id=client.id, yaml_text=body.yaml_content)
+        db.add(row)
+    else:
+        row.yaml_text = body.yaml_content
+        row.updated_at = datetime.utcnow()
+    db.commit()
+    names, _ = connection_source.profile_names(body.yaml_content)
+    return {"ok": True, "profiles": names}

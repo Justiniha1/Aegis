@@ -97,8 +97,7 @@ def execute_run(
         _name_to_id, _deduplicate_test_ids,
     )
     from backend.core.test_engine import TestEngine
-    from backend.core.config_loader import _load_yaml, _resolve_env_vars
-    from dashboard_api.profile_loader import _resolve_path
+    from dashboard_api import connection_source
 
     db = SessionLocal()
     try:
@@ -113,11 +112,8 @@ def execute_run(
         # Resolve the connection from the connection YAML — the same file the engine
         # uses. We pass the raw profile dict through; the engine's DatabaseConnector
         # resolves relative SQLite paths (against the config dir) and connection_url.
-        try:
-            raw_conns = _resolve_env_vars(_load_yaml(_resolve_path()))
-        except Exception:
-            raw_conns = {}
-        prof = raw_conns.get(profile)
+        yaml_text = connection_source.get_yaml_text(db, client_id)
+        prof = connection_source.resolve_profile(yaml_text, profile)
         if not isinstance(prof, dict):
             run.status = "FAILED"
             run.error_reason = _sanitize_error(

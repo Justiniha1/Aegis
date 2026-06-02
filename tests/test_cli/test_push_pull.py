@@ -35,8 +35,7 @@ def test_pull_writes_yaml_to_disk(aegis_project):
     with patch("cli.commands.pull.AegisClient") as MockClient:
         mock = MockClient.return_value
         mock.get_text.return_value = yaml_from_api
-        mock.get.return_value = []          # no connection profiles to write
-        result = runner.invoke(app, ["pull", "--yes"])
+        result = runner.invoke(app, ["pull"])
     assert result.exit_code == 0
     content = (aegis_project / "aegis" / "test_definitions.yaml").read_text()
     assert content == yaml_from_api

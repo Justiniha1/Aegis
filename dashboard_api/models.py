@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, JSON, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, JSON, String, Text
 from sqlalchemy.orm import relationship
 
 from dashboard_api.database import Base
@@ -75,3 +75,12 @@ class TestDefinition(Base):
     updated_at = Column(DateTime, default=datetime.utcnow)
 
     client = relationship("Client", back_populates="test_definitions")
+
+
+class ConnectionConfig(Base):
+    __tablename__ = "connection_config"
+
+    id = Column(Integer, primary_key=True)
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False, unique=True, index=True)
+    yaml_text = Column(Text, nullable=False, default="")
+    updated_at = Column(DateTime, default=datetime.utcnow)
