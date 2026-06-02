@@ -81,6 +81,6 @@ def profile_to_payload(name: str, parsed: dict):
         if secret is not None:
             payload["secret_value"] = secret
         else:
-            warning = (f"{parsed['secret_env']} not set — kept existing dashboard secret "
+            warning = (f"{parsed['secret_env']} not set - kept existing dashboard secret "
                        f"for '{name}'")
     return payload, warning

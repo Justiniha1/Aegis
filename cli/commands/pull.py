@@ -31,7 +31,7 @@ def _readiness_lines(remote: list[dict]) -> list[str]:
     for p in remote:
         env = p.get("secret_env")
         if not env:
-            lines.append(f"  {p['name']:<12} {p.get('db_type',''):<10} ✓ no secret needed")
+            lines.append(f"  {p['name']:<12} {p.get('db_type',''):<10} OK  no secret needed")
         else:
             state = "SET" if os.environ.get(env) else "NOT SET"
             lines.append(f"  {p['name']:<12} {p.get('db_type',''):<10} needs ${env}   [{state}]")

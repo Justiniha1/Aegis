@@ -1,5 +1,4 @@
 from pathlib import Path
-import requests
 import yaml
 import typer
 from cli.config import load_config
@@ -18,7 +17,7 @@ def _reconcile_profiles(client, local: dict, confirm, dry_run: bool = False) -> 
         parsed = parse_yaml_profile(name, profile)
         payload, warning = profile_to_payload(name, parsed)
         if warning:
-            typer.echo(f"[aegis] ⚠ {warning}")
+            typer.echo(f"[aegis] WARN: {warning}")
         existed = name in remote_by_name
         if dry_run:
             typer.echo(f"[aegis]   {'update' if existed else 'create'} {name}")
@@ -28,7 +27,7 @@ def _reconcile_profiles(client, local: dict, confirm, dry_run: bool = False) -> 
             client.post("/api/v1/profiles", json=payload)
             summary["updated" if existed else "created"] += 1
         except Exception as e:
-            typer.echo(f"[aegis] Profile '{name}': push failed — {e}")
+            typer.echo(f"[aegis] Profile '{name}': push failed - {e}")
             summary["errors"] += 1
 
     stale = [p for n, p in remote_by_name.items() if n not in local]
@@ -44,7 +43,7 @@ def _reconcile_profiles(client, local: dict, confirm, dry_run: bool = False) -> 
                     client.delete(f"/api/v1/profiles/{p['id']}")
                     summary["deleted"] += 1
                 except Exception as e:
-                    typer.echo(f"[aegis] Profile '{p['name']}': delete failed — {e}")
+                    typer.echo(f"[aegis] Profile '{p['name']}': delete failed - {e}")
                     summary["errors"] += 1
     return summary
 
@@ -86,7 +85,9 @@ def push_cmd(
         typer.echo(f"[aegis] Could not parse database_connection.yaml: {e}")
         return
 
-    local = {k: v for k, v in raw.items() if isinstance(v, dict)}
+    # Only treat mappings with a 'type' as profiles - mirrors pull's heuristic so a
+    # non-profile block (e.g. settings:) is never pushed as a junk profile.
+    local = {k: v for k, v in raw.items() if isinstance(v, dict) and "type" in v}
     if not local:
         return
 
