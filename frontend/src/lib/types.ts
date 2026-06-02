@@ -69,5 +69,11 @@ export interface ProfileOut {
   id: number;
   name: string;
   db_type: string;
+  host: string | null;
+  port: number | null;
+  database: string | null;
+  username: string | null;
+  sqlite_path: string | null;
+  secret_env: string | null;
   created_at: string;
 }
