@@ -1,4 +1,5 @@
 from cli.commands.push import _reconcile_profiles
+from cli.commands.pull import _profiles_to_yaml_dict, _readiness_lines
 
 
 class FakeClient:
@@ -50,3 +51,26 @@ def test_push_unset_env_warns_and_omits_secret(monkeypatch, capsys):
     _reconcile_profiles(c, local, confirm=lambda *_a, **_k: True)
     assert "secret_value" not in c.posts[0]
     assert "not set" in capsys.readouterr().out
+
+
+def test_profiles_to_yaml_dict_uses_env_ref_placeholder():
+    remote = [
+        {"name": "dev", "db_type": "sqlite", "sqlite_path": "/app/data/x.db", "secret_env": None,
+         "host": None, "port": None, "database": None, "username": None},
+        {"name": "staging", "db_type": "postgresql", "host": "h", "port": 5432, "database": "db",
+         "username": "u", "secret_env": "AEGIS_STAGING_PASSWORD", "sqlite_path": None},
+    ]
+    d = _profiles_to_yaml_dict(remote)
+    assert d["dev"] == {"type": "sqlite", "path": "/app/data/x.db"}
+    assert d["staging"]["password"] == "${AEGIS_STAGING_PASSWORD}"
+    assert d["staging"]["type"] == "postgresql" and d["staging"]["host"] == "h"
+
+
+def test_readiness_lines_flags_unset(monkeypatch):
+    monkeypatch.delenv("AEGIS_STAGING_PASSWORD", raising=False)
+    remote = [{"name": "staging", "db_type": "postgresql", "secret_env": "AEGIS_STAGING_PASSWORD"},
+              {"name": "dev", "db_type": "sqlite", "secret_env": None}]
+    lines = _readiness_lines(remote)
+    joined = "\n".join(lines)
+    assert "AEGIS_STAGING_PASSWORD" in joined and "NOT SET" in joined
+    assert "no secret needed" in joined
