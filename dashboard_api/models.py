@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, JSON, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, JSON, String, Text
 from sqlalchemy.orm import relationship
 
 from dashboard_api.database import Base
@@ -18,7 +18,6 @@ class Client(Base):
 
     results = relationship("TestResult", back_populates="client")
     test_definitions = relationship("TestDefinition", back_populates="client", cascade="all, delete-orphan")
-    connection_profiles = relationship("ConnectionProfile", cascade="all, delete-orphan")
 
 
 class Run(Base):
@@ -78,16 +77,10 @@ class TestDefinition(Base):
     client = relationship("Client", back_populates="test_definitions")
 
 
-class ConnectionProfile(Base):
-    __tablename__ = "connection_profiles"
+class ConnectionConfig(Base):
+    __tablename__ = "connection_config"
 
     id = Column(Integer, primary_key=True)
-    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False, index=True)
-    name = Column(String, nullable=False)          # e.g. "production", "dev"
-    connection_url_encrypted = Column(String, nullable=False)
-    db_type = Column(String, nullable=False)       # display only: "postgresql", "mysql", etc.
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    __table_args__ = (
-        Index("ix_profiles_client_name", "client_id", "name", unique=True),
-    )
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False, unique=True, index=True)
+    yaml_text = Column(Text, nullable=False, default="")
+    updated_at = Column(DateTime, default=datetime.utcnow)

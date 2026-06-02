@@ -20,3 +20,4 @@ class AegisClient:
         resp = requests.get(f"{self._base}{path}", headers=self._headers, timeout=15, **kwargs)
         resp.raise_for_status()
         return resp.text
+

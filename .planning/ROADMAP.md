@@ -4,7 +4,7 @@
 
 - ✅ **v1.0 Demo Readiness** — Phases 1–2 (shipped 2026-05-22)
 - ✅ **v1.1 First Client: Airflow Integration** — Phases 3–4 (shipped 2026-05-26)
-- 🔄 **v1.2 First Client Handoff** — Phases 5–7 (in progress)
+- 🔄 **v1.2 First Client Handoff** — Phases 5–8 (Phase 8 pending merge)
 
 ## Phases
 
@@ -29,7 +29,8 @@
 
 - [x] **Phase 5: SDK Reliability** — `run_checks()` timeout parameter + operator passthrough (complete 2026-05-27)
 - [x] **Phase 6: Profile Switcher UI** — Settings page component for selecting active connection profile (complete 2026-05-29)
-- [ ] **Phase 7: Railway Deployment** — `railway.toml`, README deploy runbook, post-deploy checklist
+- [x] **Phase 7: Railway Deployment** — per-service `railway.toml` ×3, `DEPLOY.md` runbook, post-deploy checklist (complete 2026-05-29)
+- [x] **Phase 8: Connection Profile Sync** — file-driven profiles: `aegis push` → `POST /api/v1/profiles/sync`, selector-only Settings, server runs resolve via engine resolver (complete on branch `phase-8-profile-sync` 2026-06-01; **pending merge**)
 
 ## Phase Details
 
@@ -85,10 +86,22 @@ Plans:
 Plans:
 
 **Wave 1**
-- [ ] 07-01-PLAN.md — Add psycopg2-binary to api requirements + write the three per-service railway.toml (api/frontend/engine)
+- [x] 07-01-PLAN.md — Add psycopg2-binary to api requirements + write the three per-service railway.toml (api/frontend/engine)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 07-02-PLAN.md — Write DEPLOY.md runbook (provisioning, env vars, two-step URL wiring, post-deploy checklist) + link it from README.md
+- [x] 07-02-PLAN.md — Write DEPLOY.md runbook (provisioning, env vars, two-step URL wiring, post-deploy checklist) + link it from README.md
+
+### Phase 8: Connection Profile Sync
+**Goal**: One source of truth for connection profiles, synced from local YAML to the dashboard, with no secrets in tracked files or the database
+**Depends on**: Phase 6 (Settings profile selector), Phase 7 (Railway deploy target)
+**Status**: Complete on branch `phase-8-profile-sync` (2026-06-01); **NOT merged, NOT pushed**
+**Outcome** (final, file-driven model — supersedes the original structured/encrypted design at `docs/superpowers/{specs,plans}/2026-06-01-profile-sync*`):
+  1. Profiles defined in `backend/config/database_connection.yaml` (names + `${ENV}` secrets); one source of truth
+  2. `aegis push` uploads the YAML to `POST /api/v1/profiles/sync`, stored per-client; dashboard prefers uploaded YAML over disk (`dashboard_api/connection_source.py`)
+  3. `GET /api/v1/profiles` returns `{name, is_default}` only; Settings page is selector-only (no CRUD)
+  4. Server-side runs resolve connections via the engine's own resolver (`backend/core/config_loader.py`) — fixes the relative-SQLite-path "unable to open database file" bug
+  5. Secrets stay as `${ENV}` resolved at run time — no Fernet encryption, `AEGIS_ENCRYPTION_KEY` removed
+**Note**: tracked outside `.planning/phases/` (no `08-` dir); built directly on the branch. Audit H-1 fixed (trigger validates against `connection_source`). Browser UAT of the selector-only Settings still pending user confirmation.
 
 ## Progress
 
@@ -101,8 +114,9 @@ Plans:
 | 4. Production Hardening | v1.1 | 2/2 | Complete | 2026-05-26 |
 | 5. SDK Reliability | v1.2 | 3/3 | Complete | 2026-05-27 |
 | 6. Profile Switcher UI | v1.2 | 1/1 | Complete | 2026-05-29 |
-| 7. Railway Deployment | v1.2 | 0/2 | Planned | - |
+| 7. Railway Deployment | v1.2 | 2/2 | Complete | 2026-05-29 |
+| 8. Connection Profile Sync | v1.2 | — | Complete (pending merge) | 2026-06-01 |
 
 ---
 *Roadmap created: 2026-05-07*
-*Last updated: 2026-05-29 — Phase 7 planned (2 plans, 2 waves)*
+*Last updated: 2026-06-02 — Phase 7 marked complete; Phase 8 (profile sync, file-driven) recorded as complete-on-branch*

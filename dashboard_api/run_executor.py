@@ -97,7 +97,7 @@ def execute_run(
         _name_to_id, _deduplicate_test_ids,
     )
     from backend.core.test_engine import TestEngine
-    from dashboard_api.encryption import decrypt
+    from dashboard_api import connection_source
 
     db = SessionLocal()
     try:
@@ -109,31 +109,21 @@ def execute_run(
         run.status = "RUNNING"
         db.commit()
 
-        # Load connection profile from DB (replaces local YAML lookup)
-        conn_row = db.query(models.ConnectionProfile).filter(
-            models.ConnectionProfile.client_id == client_id,
-            models.ConnectionProfile.name == profile,
-        ).first()
-
-        if conn_row is None:
+        # Resolve the connection from the connection YAML — the same file the engine
+        # uses. We pass the raw profile dict through; the engine's DatabaseConnector
+        # resolves relative SQLite paths (against the config dir) and connection_url.
+        yaml_text = connection_source.get_yaml_text(db, client_id)
+        prof = connection_source.resolve_profile(yaml_text, profile)
+        if not isinstance(prof, dict):
             run.status = "FAILED"
             run.error_reason = _sanitize_error(
-                f"Profile '{profile}' not found — add it in Settings → Connection Profiles"
+                f"Profile '{profile}' not found in connection config"
             )
             run.completed_at = datetime.utcnow()
             db.commit()
             return
 
-        try:
-            connection_url = decrypt(conn_row.connection_url_encrypted)
-        except Exception as e:
-            run.status = "FAILED"
-            run.error_reason = _sanitize_error(f"Could not decrypt profile '{profile}': {e}")
-            run.completed_at = datetime.utcnow()
-            db.commit()
-            return
-
-        connections = {profile: {"connection_url": connection_url}}
+        connections = {profile: prof}
         engine_cfg = EngineConfig(
             engine="simple",
             default_profile=profile,

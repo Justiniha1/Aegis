@@ -14,7 +14,6 @@ services:
     environment:
       DATABASE_URL: sqlite:////app/db_data/dashboard.db
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
-      AEGIS_ENCRYPTION_KEY: ${AEGIS_ENCRYPTION_KEY}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
       DQF_YAML_PATH: /app/backend/config/test_definitions.yaml
       DQF_CONNECTION_YAML_PATH: /app/backend/config/database_connection.yaml

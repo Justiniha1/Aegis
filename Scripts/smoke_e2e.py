@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Week 1 E2E smoke test.
+E2E smoke test (file-driven profiles model).
 
 Requirements:
   - Stack running: make start
-  - .env has AEGIS_API_KEY and AEGIS_ENCRYPTION_KEY
+  - .env has AEGIS_API_KEY
   - aegis CLI installed: pip install -e ".[dev]"
 
 Run: python Scripts/smoke_e2e.py
@@ -30,8 +30,8 @@ if not API_KEY:
     sys.exit(1)
 
 HEADERS = {"X-Api-Key": API_KEY}
-PASS = "✓"
-FAIL = "✗"
+PASS = "OK"
+FAIL = "XX"
 _failed = []
 
 
@@ -51,59 +51,54 @@ def cli(*args, cwd=None) -> subprocess.CompletedProcess:
     )
 
 
-print("\n── Week 1 E2E Smoke Test ──────────────────────────────────")
+print("\n-- E2E Smoke Test --------------------------------------------")
 
-# ── 1. API health ──────────────────────────────────────────────────────────────
+# -- 1. API health --------------------------------------------------------------
 print("\n[1] API health")
 try:
     r = requests.get(f"{API_URL}/api/v1/health", timeout=5)
-    check("GET /api/v1/health → 200", r.status_code == 200, r.text)
+    check("GET /api/v1/health -> 200", r.status_code == 200, r.text)
 except requests.ConnectionError:
     print(f"  {FAIL} Cannot reach {API_URL} — is 'make start' running?")
     sys.exit(1)
 
-# ── 2. Connection profiles CRUD ────────────────────────────────────────────────
-print("\n[2] Connection profiles CRUD")
+# -- 2. Connection profiles (file-driven /sync) ---------------------------------
+print("\n[2] Connection profiles — /profiles/sync")
 
-# Create
-r = requests.post(f"{API_URL}/api/v1/profiles", json={
-    "name": "smoke-test",
-    "connection_url": "sqlite:///./smoke_test.db",
-    "db_type": "sqlite",
-}, headers=HEADERS)
-check("POST /api/v1/profiles → 201", r.status_code == 201, r.text)
-profile_id = r.json().get("id") if r.status_code == 201 else None
+# Upload a connection YAML; the dashboard stores it per-client and prefers it
+# over the on-disk file. The "dev" profile matches the test_definitions template
+# (settings.default_profile), so a subsequent run can find enabled tests.
+_SMOKE_CONN_YAML = (
+    "dev:\n"
+    "  type: sqlite\n"
+    "  path: ../../data/raw/sample_ecommerce.db\n"
+)
+r = requests.post(
+    f"{API_URL}/api/v1/profiles/sync",
+    json={"yaml_content": _SMOKE_CONN_YAML},
+    headers=HEADERS,
+)
+check("POST /api/v1/profiles/sync -> 200", r.status_code == 200, r.text)
+synced = r.json().get("profiles", []) if r.status_code == 200 else []
+check("sync reports the 'dev' profile", "dev" in synced, str(synced))
 
-# List
+# GET must now return the synced profile names (no secrets, no CRUD).
 r = requests.get(f"{API_URL}/api/v1/profiles", headers=HEADERS)
+body = r.json() if r.status_code == 200 else []
+check("GET /api/v1/profiles includes dev", any(p["name"] == "dev" for p in body))
 check(
-    "GET /api/v1/profiles includes smoke-test",
-    any(p["name"] == "smoke-test" for p in r.json()),
+    "profiles expose names only (no secrets)",
+    all(set(p.keys()) <= {"name", "is_default"} for p in body),
+    str(body),
 )
 
-# Duplicate → 409
-r = requests.post(f"{API_URL}/api/v1/profiles", json={
-    "name": "smoke-test", "connection_url": "sqlite:///./x.db", "db_type": "sqlite",
-}, headers=HEADERS)
-check("Duplicate profile → 409", r.status_code == 409)
-
-# ── 3. CLI commands ────────────────────────────────────────────────────────────
+# -- 3. CLI commands ------------------------------------------------------------
 print("\n[3] CLI commands")
-
-# All 18 real test definitions have profile "dev" (settings.default_profile).
-# Create a matching ConnectionProfile so trigger_run can find enabled tests.
-r = requests.post(f"{API_URL}/api/v1/profiles", json={
-    "name": "dev",
-    "connection_url": "sqlite:///./smoke_dev.db",
-    "db_type": "sqlite",
-}, headers=HEADERS)
-run_profile_id = r.json().get("id") if r.status_code == 201 else None
-# 409 = "dev" already exists — fine, don't delete it at cleanup.
 
 tmpdir = tempfile.mkdtemp(prefix="aegis_smoke_")
 
 try:
-    # aegis init
+    # aegis init — scaffolds aegis/{config,test_definitions,database_connection}.yaml
     result = cli("init", cwd=tmpdir)
     check("aegis init exits 0", result.returncode == 0, result.stderr)
     check(
@@ -120,12 +115,17 @@ try:
     result = cli("pull", cwd=tmpdir)
     check("aegis pull exits 0", result.returncode == 0, result.stderr)
 
-    # aegis push — syncs pulled content back (no net change, confirms round-trip)
+    # aegis push — syncs test_definitions.yaml AND database_connection.yaml
     result = cli("push", cwd=tmpdir)
     check("aegis push exits 0", result.returncode == 0, result.stderr)
     check(
-        "push reports counts",
+        "push reports test counts",
         any(k in result.stdout for k in ("created=", "updated=", "unchanged=")),
+        result.stdout,
+    )
+    check(
+        "push syncs connection profiles",
+        "Profiles synced" in result.stdout,
         result.stdout,
     )
 
@@ -146,19 +146,10 @@ try:
 finally:
     shutil.rmtree(tmpdir, ignore_errors=True)
 
-# ── 4. Cleanup ─────────────────────────────────────────────────────────────────
-print("\n[4] Cleanup")
-if profile_id:
-    r = requests.delete(f"{API_URL}/api/v1/profiles/{profile_id}", headers=HEADERS)
-    check("DELETE smoke-test profile → 204", r.status_code == 204)
-if run_profile_id:
-    r = requests.delete(f"{API_URL}/api/v1/profiles/{run_profile_id}", headers=HEADERS)
-    check("DELETE dev smoke profile → 204", r.status_code == 204)
-
-# ── Result ─────────────────────────────────────────────────────────────────────
+# -- Result ---------------------------------------------------------------------
 print()
 if _failed:
-    print(f"── {len(_failed)} check(s) FAILED: {', '.join(_failed)}")
+    print(f"-- {len(_failed)} check(s) FAILED: {', '.join(_failed)}")
     sys.exit(1)
 else:
-    print("── All checks passed ──────────────────────────────────────\n")
+    print("-- All checks passed ---------------------------------------\n")
