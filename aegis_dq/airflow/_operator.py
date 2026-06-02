@@ -24,6 +24,10 @@ class AegisDQOperator(BaseOperator):
         profile:            Connection profile name to run.
         type_filter:        Optional list of test type names to restrict the run.
         poll_interval:      Seconds between API status polls (default: 5).
+        max_wait_seconds:  Hard deadline in seconds passed to run_checks(). Raises
+                           AegisDQRunTimeout if the run has not completed within this
+                           deadline. Supports Jinja templating. None (default) polls
+                           indefinitely.
         api_url:            Aegis API base URL. Overrides AEGIS_API_URL env var.
         api_key:            Aegis API key. Overrides AEGIS_API_KEY env var.
         airflow_var_api_url: Airflow Variable name holding the API URL.
@@ -34,7 +38,7 @@ class AegisDQOperator(BaseOperator):
     """
 
     # Airflow uses template_fields to allow Jinja templating in task params.
-    template_fields: Sequence[str] = ("profile",)
+    template_fields: Sequence[str] = ("profile", "max_wait_seconds")
 
     def __init__(
         self,
@@ -42,6 +46,7 @@ class AegisDQOperator(BaseOperator):
         profile: str = "default",
         type_filter: list[str] | None = None,
         poll_interval: int = 5,
+        max_wait_seconds: int | None = None,
         api_url: str | None = None,
         api_key: str | None = None,
         airflow_var_api_url: str | None = None,
@@ -52,6 +57,7 @@ class AegisDQOperator(BaseOperator):
         self.profile = profile
         self.type_filter = type_filter
         self.poll_interval = poll_interval
+        self.max_wait_seconds = max_wait_seconds
         self._api_url = api_url
         self._api_key = api_key
         self._airflow_var_api_url = airflow_var_api_url
@@ -106,6 +112,7 @@ class AegisDQOperator(BaseOperator):
                 poll_interval=self.poll_interval,
                 api_url=resolved_url,
                 api_key=resolved_key,
+                max_wait_seconds=self.max_wait_seconds,
             )
         except AegisDQChecksFailed as exc:
             self.log.error(

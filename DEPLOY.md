@@ -169,7 +169,7 @@ Run these against the live instance:
    $resp | ConvertTo-Json
    ```
    **Save the `api_key`** from the `201` response — it is **shown once only** and is
-   the `DQF_API_KEY` your Airflow worker will need.
+   the `AEGIS_API_KEY` your Airflow worker will need.
 
 3. **Confirm login:** open `https://<frontend>.railway.app`, log in with that
    email/password. The dashboard should load with **no console CORS errors**.
@@ -177,10 +177,12 @@ Run these against the live instance:
 4. **Point an Airflow worker at the live API.** The engine runs on the client's own
    infra (D-04). In the Airflow environment / `.env` used by the `aegis-dq` SDK, set:
    ```
-   DQF_API_URL=https://<api>.railway.app
-   DQF_API_KEY=<api_key saved in step 2>
+   AEGIS_API_URL=https://<api>.railway.app
+   AEGIS_API_KEY=<api_key saved in step 2>
    ```
    No DAG code change is needed — `aegis_dq/_client.py` reads these at import.
+   (Note: these are the **SDK** variables `AEGIS_API_URL`/`AEGIS_API_KEY` — not the
+   backend engine's `DQF_API_URL`/`DQF_API_KEY`, which are a different integration.)
 
 ---
 

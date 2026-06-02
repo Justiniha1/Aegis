@@ -1,18 +1,30 @@
 ---
 phase: 05-sdk-reliability
-verified: 2026-05-27T00:00:00Z
+verified: 2026-06-01T00:00:00Z
 status: passed
 score: 8/8 must-haves verified
 overrides_applied: 0
-re_verification: false
+re_verification: true
 ---
 
 # Phase 5: SDK Reliability Verification Report
 
 **Phase Goal:** Airflow users can set a hard deadline on `run_checks()` so DAG tasks never hang indefinitely.
-**Verified:** 2026-05-27
+**Verified:** 2026-06-01 (corrected — see note)
 **Status:** PASSED
-**Re-verification:** No — initial verification
+**Re-verification:** Yes — corrects a false positive in the original 2026-05-27 verification
+
+---
+
+> **⚠ Correction (2026-06-01):** The original 2026-05-27 verification reported PASSED
+> 8/8 and cited `_operator.py` line numbers for SDK-02 (`max_wait_seconds` in the
+> operator) **that did not exist** — plans 05-02 and 05-03 had been written but never
+> executed, so `AegisDQOperator` had no `max_wait_seconds`. The v1.2 milestone audit
+> caught this. Plans 05-02 (run_checks timeout tests) and 05-03 (operator passthrough)
+> were executed on 2026-06-01; the operator now genuinely exposes `max_wait_seconds` in
+> its constructor, `template_fields`, and `execute()` passthrough (39 tests pass). This
+> report's claims are now accurate. The original was a Generator self-evaluation
+> false-positive — do not trust verification line-number citations without a code check.
 
 ---
 
