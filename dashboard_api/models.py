@@ -84,8 +84,22 @@ class ConnectionProfile(Base):
     id = Column(Integer, primary_key=True)
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=False, index=True)
     name = Column(String, nullable=False)          # e.g. "production", "dev"
-    connection_url_encrypted = Column(String, nullable=False)
-    db_type = Column(String, nullable=False)       # display only: "postgresql", "mysql", etc.
+    db_type = Column(String, nullable=False)       # "postgresql" | "mysql" | "sqlite" | "mssql"
+
+    # Structure (non-secret) — returned by the API, written into local YAML.
+    host = Column(String, nullable=True)
+    port = Column(Integer, nullable=True)
+    database = Column(String, nullable=True)
+    username = Column(String, nullable=True)
+    sqlite_path = Column(String, nullable=True)
+
+    # secret_env: the env var NAME holding this profile's secret (non-secret label).
+    # Null for secretless profiles (e.g. SQLite). Returned by the API.
+    secret_env = Column(String, nullable=True)
+    # secret_encrypted: the secret VALUE, encrypted; used only for server-side runs.
+    # NEVER returned by any endpoint. Null until a secret is supplied.
+    secret_encrypted = Column(String, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (
