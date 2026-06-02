@@ -89,6 +89,19 @@ def test_update_without_secret_preserves_existing_secret(client_app):
     db.close()
 
 
+def test_empty_secret_value_does_not_clobber_existing(client_app):
+    tc, headers, Session = client_app
+    pid = _create(tc, headers, name="staging", db_type="postgresql", host="h", username="u",
+                  secret_value="keepme").json()["id"]
+    # re-upsert (and PUT) with an empty secret_value — must preserve the stored secret
+    _create(tc, headers, name="staging", db_type="postgresql", host="h2", username="u", secret_value="")
+    tc.put(f"/api/v1/profiles/{pid}", json={"host": "h3", "secret_value": ""}, headers=headers)
+    db = Session()
+    row = db.query(ConnectionProfile).filter_by(id=pid).first()
+    assert decrypt(row.secret_encrypted) == "keepme"
+    db.close()
+
+
 def test_sqlite_profile_no_secret(client_app):
     tc, headers, _ = client_app
     r = _create(tc, headers, name="dev", db_type="sqlite", sqlite_path="/app/data/x.db")

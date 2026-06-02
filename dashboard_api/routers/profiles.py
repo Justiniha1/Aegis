@@ -47,7 +47,9 @@ def upsert_profile(
     elif row.secret_env is None:
         row.secret_env = _default_secret_env(body.name)
 
-    if body.secret_value is not None:
+    # No-clobber: only write a secret when a non-empty one is supplied. An empty
+    # string (e.g. an unset env var flowing through the CLI) means "keep existing".
+    if body.secret_value:
         row.secret_encrypted = encrypt(body.secret_value)
 
     if is_new:
@@ -89,7 +91,7 @@ def update_profile(
     if (row.db_type or "").lower() == "sqlite":
         row.secret_env = None
 
-    if body.secret_value is not None:          # no-clobber: only overwrite when supplied
+    if body.secret_value:                      # no-clobber: empty/None preserves existing
         row.secret_encrypted = encrypt(body.secret_value)
 
     db.commit()
