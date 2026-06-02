@@ -1,0 +1,288 @@
+# ============================================================================
+# DATABASE CONNECTION PROFILES
+# ============================================================================
+# Inspired by Soda's simplicity + Great Expectations' flexibility
+#
+# HOW TO USE:
+# 1. Each top-level key is a profile name (dev, staging, prod, etc.)
+# 2. Set 'type' to specify database (sqlite, postgres, mysql, snowflake)
+# 3. Add connection details directly under the profile
+# 4. Use ${ENV_VAR} for sensitive values (passwords, hosts)
+# 5. Test with: dqf test-connection --profile profile_name
+#
+# SECURITY NOTE:
+# - Option 1: Use ${ENV_VAR} for all sensitive values (recommended)
+# - Option 2: Create credentials.yaml (gitignored) for local dev only
+# - Option 3: Use secrets_provider for production environments
+
+
+#Local development database:
+dev:
+  type: sqlite
+  path: /app/data/raw/sample_ecommerce.db
+
+
+# ----------------------------------------------------------------------------
+# Staging Profile (PostgreSQL with environment variables)
+# ----------------------------------------------------------------------------
+# Standard approach: Environment variables for credentials
+# Perfect for: Staging servers, CI/CD environments
+#
+# Set these environment variables:
+#   export STAGING_DB_HOST=staging.company.com
+#   export STAGING_DB_USER=readonly_user
+#   export STAGING_DB_PASSWORD=secure_password123
+
+staging:
+  type: postgres
+  host: ${STAGING_DB_HOST}
+  port: 5432
+  database: analytics
+  username: ${STAGING_DB_USER}
+  password: ${STAGING_DB_PASSWORD}
+  schema: public
+  
+  # Optional: Database-specific connection parameters
+  # These get passed directly to the database driver
+  connect_args:
+    sslmode: prefer
+    connect_timeout: 10
+    application_name: dqf
+
+
+#Production Profile (MySQL with secrets provider)
+# Most secure: Pull all credentials from secrets manager
+# Perfect for: Production environments, compliance requirements
+#
+# AWS Secret JSON format:
+# {
+#   "host": "prod-db.company.com",
+#   "port": 5432,
+#   "database": "analytics",
+#   "username": "dqf_readonly",
+#   "password": "very_secure_password"
+# }
+
+prod_secure:
+  type: postgres
+  secrets_provider: aws_secrets_manager
+  secret_name: prod/dqf/database
+  region: us-east-1
+
+
+prod_mysql:
+  type: MySQL
+  host: ${MYSQL_HOST}
+  port: 3306
+  database: ${MYSQL_DATABASE}
+  username: ${MYSQL_USER}
+  password: ${MYSQL_PASSWORD}
+
+
+  # ----------------------------------------------------------------------------
+# Example: Multiple Environments for Same Database
+# ----------------------------------------------------------------------------
+# You can have as many profiles as you need
+
+# analytics_dev:
+#   type: postgres
+#   host: localhost
+#   port: 5432
+#   database: analytics_dev
+#   username: dev_user
+#   password: dev_password
+
+# analytics_staging:
+#   type: postgres
+#   host: staging.company.com
+#   port: 5432
+#   database: analytics
+#   username: ${STAGING_USER}
+#   password: ${STAGING_PASSWORD}
+
+# analytics_prod:
+#   type: postgres
+#   connection_string: ${PROD_DATABASE_URL}
+
+
+# ============================================================================
+# REFERENCE: Fields by Database Type
+# ============================================================================
+
+# SQLite (local file database)
+# ----------------------------
+# Required:
+#   type: sqlite
+#   path: /path/to/database.db
+
+# PostgreSQL
+# ----------
+# Method 1 - Structured:
+#   type: postgres
+#   host: hostname
+#   port: 5432 (default)
+#   database: database_name
+#   username: user
+#   password: password
+#   schema: public (optional)
+#
+# Method 2 - Connection String:
+#   type: postgres
+#   connection_string: postgresql://user:pass@host:5432/database
+
+# MySQL
+# -----
+# Method 1 - Structured:
+#   type: mysql
+#   host: hostname
+#   port: 3306 (default)
+#   database: database_name
+#   username: user
+#   password: password
+#
+# Method 2 - Connection String:
+#   type: mysql
+#   connection_string: mysql://user:pass@host:3306/database
+
+# ============================================================================
+# ENVIRONMENT VARIABLES
+# ============================================================================
+# Recommended approach for production:
+#
+# 1. Create a .env file (DO NOT commit to git):
+#    STAGING_DB_HOST=staging.company.com
+#    STAGING_DB_USER=readonly
+#    STAGING_DB_PASSWORD=secure_password
+#
+# 2. Or export in your shell:
+#    export STAGING_DB_HOST=staging.company.com
+#    export STAGING_DB_USER=readonly
+#    export STAGING_DB_PASSWORD=secure_password
+#
+# 3. Or set in your CI/CD system:
+#    - GitHub Actions: Settings → Secrets
+#    - GitLab CI: Settings → CI/CD → Variables
+#    - Jenkins: Credentials
+#
+# The DQF will automatically substitute ${VAR_NAME} with environment values
+
+# ============================================================================
+# CONNECT_ARGS (Database-Specific Parameters)
+# ============================================================================
+# The connect_args field allows you to pass any parameter to the database
+# driver without us having to support every possible option explicitly.
+#
+# PostgreSQL common connect_args:
+#   sslmode: disable|allow|prefer|require|verify-ca|verify-full
+#   connect_timeout: seconds
+#   application_name: string (shows in pg_stat_activity)
+#   keepalives_idle: seconds
+#
+# MySQL common connect_args:
+#   charset: utf8mb4
+#   connect_timeout: seconds
+#   autocommit: true|false
+#
+# Add ANY parameter supported by your database driver here
+
+# ============================================================================
+# SECRETS PROVIDERS
+# ============================================================================
+# For production environments, pull credentials from secrets managers:
+#
+# AWS Secrets Manager:
+#   secrets_provider: aws_secrets_manager
+#   secret_name: prod/dqf/database
+#   region: us-east-1
+#
+# GCP Secret Manager:
+#   secrets_provider: gcp_secret_manager
+#   secret_name: prod-dqf-database
+#   project: my-gcp-project
+#
+# Azure Key Vault:
+#   secrets_provider: azure_key_vault
+#   vault_url: https://my-vault.vault.azure.net/
+#   secret_name: prod-dqf-database
+#
+# HashiCorp Vault:
+#   secrets_provider: vault
+#   vault_addr: https://vault.company.com
+#   vault_path: secret/data/prod-db
+
+# ============================================================================
+# TESTING YOUR CONNECTIONS
+# ============================================================================
+# Before running data quality tests, verify connections work:
+#
+#   dqf test-connection --profile dev
+#   dqf test-connection --profile staging
+#   dqf test-connection --profile prod
+#
+# This will:
+#   1. Load the profile configuration
+#   2. Substitute environment variables
+#   3. Attempt to connect to the database
+#   4. Show success/failure with helpful error messages
+#   5. NOT run any actual tests (just validates connection)
+
+# ============================================================================
+# TROUBLESHOOTING
+# ============================================================================
+# Connection failed?
+#
+# 1. Check environment variables are set:
+#    echo $STAGING_DB_HOST
+#    echo $STAGING_DB_PASSWORD
+#
+# 2. Test from command line first:
+#    psql -h $STAGING_DB_HOST -U $STAGING_DB_USER -d analytics
+#
+# 3. Check firewall/network:
+#    - Can your server reach the database host?
+#    - Are you connecting from an allowed IP?
+#    - Is SSL/TLS required?
+#
+# 4. Verify credentials:
+#    - Username correct?
+#    - Password correct?
+#    - Does user have SELECT permission?
+#
+# 5. Enable debug logging:
+#    dqf test-connection --profile staging --debug
+
+# ============================================================================
+# SECURITY BEST PRACTICES
+# ============================================================================
+# 1. NEVER commit passwords to git
+#    - Use ${ENV_VAR} for all secrets
+#    - Or use secrets_provider in production
+#
+# 2. Use read-only database users
+#    - DQF only needs SELECT permission
+#    - Don't use admin accounts
+#
+# 3. Rotate credentials regularly
+#    - Change passwords quarterly
+#    - Use secrets managers for automated rotation
+#
+# 4. Restrict network access
+#    - Database should only accept connections from DQF server
+#    - Use VPN or SSH tunnel if needed
+#
+# 5. Monitor access
+#    - Log all database connections
+#    - Alert on failed authentication attempts
+
+# ============================================================================
+# GITIGNORE RECOMMENDATIONS
+# ============================================================================
+# Add to your .gitignore:
+#
+#   # Database credentials (if storing locally)
+#   database_connections.yaml
+#   credentials.yaml
+#   .env
+#   
+#   # Or use git-crypt to encrypt this file in repo
+#   # See: https://github.com/AGWA/git-crypt

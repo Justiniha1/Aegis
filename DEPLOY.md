@@ -71,15 +71,12 @@ Set these in each service's **Variables** tab. **No secrets ever go into the
 |----------|-------|-------|
 | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` | **Reference variable** — links to the managed Postgres. |
 | `JWT_SECRET_KEY` | 32+ char random | Use Railway's **CMD+K → "Generate secret"**. Must be **stable across restarts** — if it changes, every existing login is invalidated on each redeploy. |
-| `AEGIS_ENCRYPTION_KEY` | a **valid Fernet key** | Do **NOT** use Railway's secret generator (it produces hex, which Fernet rejects at decrypt time). Generate it yourself — see below. |
 | `ALLOWED_ORIGINS` | `https://<frontend>.railway.app` | Exact frontend URL, **no wildcard** (`*` is forbidden — it breaks credentialed CORS). Set this in step 5 once the frontend domain exists. |
 | `DQF_YAML_PATH` | `/tmp/test_definitions.yaml` | Optional. Railway has no persistent volume, so don't rely on disk paths. |
 
-Generate the Fernet key locally and paste the output:
-
-```bash
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-```
+> **Connection-profile secrets** (DB passwords/hosts referenced as `${VAR}` in
+> `database_connection.yaml`) are set as their own Railway Variables and resolved
+> from the environment at run time — there is no separate encryption key to manage.
 
 ### `frontend` service
 
@@ -203,8 +200,9 @@ Run these against the live instance:
 - `POST /api/v1/clients` is unauthenticated by design for a private instance.
   After registering, treat the API URL as semi-private and keep `ALLOWED_ORIGINS`
   locked to your exact frontend domain.
-- `AEGIS_ENCRYPTION_KEY` **must** be a real Fernet key, or connection-profile
-  decryption fails at runtime.
+- **Connection-profile secrets** are referenced as `${VAR}` in
+  `database_connection.yaml` and resolved from Railway Variables at run time —
+  never commit real credentials to the YAML.
 
 ---
 

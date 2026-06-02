@@ -1,5 +1,4 @@
 import pytest
-from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 
 from dashboard_api.models import Base, Client
@@ -20,7 +19,6 @@ staging:
 
 @pytest.fixture()
 def client_app(monkeypatch, tmp_path):
-    monkeypatch.setenv("AEGIS_ENCRYPTION_KEY", Fernet.generate_key().decode())
     monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-32-chars-xxxxxxxxx")
     conn = tmp_path / "database_connection.yaml"
     conn.write_text(_YAML, encoding="utf-8")
