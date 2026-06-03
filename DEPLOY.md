@@ -206,6 +206,66 @@ Run these against the live instance:
 
 ---
 
+## Hosted scheduler
+
+The `api` service includes an in-process APScheduler that triggers recurring runs for
+cloud-reachable connection profiles. This section documents the operational constraints
+you must respect to keep it working correctly.
+
+### Single-process / single-replica requirement
+
+The scheduler runs inside the `api` process. It has no distributed lock. If the `api`
+service runs more than one process or more than one Railway replica simultaneously, every
+process that has the scheduler enabled will fire each due schedule independently —
+resulting in duplicate runs.
+
+The current `dashboard_api/Dockerfile` `CMD` starts a single uvicorn worker (no
+`--workers` flag). Do not change this while the in-process scheduler is in use.
+
+The scheduler is gated by the `AEGIS_SCHEDULER_ENABLED` environment variable:
+
+| Value | Behavior |
+|-------|----------|
+| `1` (default) | Scheduler starts on api boot |
+| `0` | Scheduler does not start (useful for staging or read-only replicas) |
+
+If you scale the `api` service to more than one Railway replica, set
+`AEGIS_SCHEDULER_ENABLED=0` on all but one replica to prevent double-firing.
+
+### New schedules table — no Alembic migration needed
+
+The `Schedule` table is new in v1.3. SQLAlchemy `create_all` in `dashboard_api/main.py`
+creates it automatically on the next api boot against your existing Railway Postgres.
+`create_all` only creates missing tables — it never alters existing tables, so no
+existing data or schema is touched. No manual migration step is required for this release.
+
+If a future release needs to add a column to an existing table, a hand-written idempotent
+migration script (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...`) will be documented here
+before that deploy.
+
+### Missed runs during downtime are skipped
+
+When the api restarts after downtime (a Railway redeploy, crash, or maintenance window),
+any schedules that were due during the outage are skipped. The scheduler does not fire
+catch-up runs. `next_run_at` is rolled forward exactly one interval from the restart time
+so the schedule resumes at the next natural trigger point.
+
+This means a daily-at-6am check that was missed during a 2-hour outage will next run at
+6am tomorrow, not immediately on restart.
+
+### Snowflake IP allowlist limitation
+
+The hosted Railway runner's egress IPs are not static. If your Snowflake account enforces
+a network policy (IP allowlist), the hosted scheduler cannot reliably reach it. Scheduled
+runs against allowlisted Snowflake instances will fail with a connection error in run
+history.
+
+For restricted Snowflake instances (and for all local/on-prem databases), use the client
+lane instead: run the engine from your own environment where you control the network
+access. See [docs/client-lane.md](docs/client-lane.md) for the runbook.
+
+---
+
 ## Re-deploy / take down and bring back up
 
 - Pushing to the connected branch redeploys automatically. Secrets persist in
