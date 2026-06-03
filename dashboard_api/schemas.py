@@ -153,4 +153,6 @@ class RunTriggerOut(BaseModel):
 class ProfileOut(BaseModel):
     name: str
     is_default: bool = False
+    db_type: str = ""
+    website_schedulable: bool = False
 

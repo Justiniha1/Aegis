@@ -55,7 +55,15 @@ def test_list_profiles_returns_names_from_yaml(client_app):
     # first profile is the default; secrets never appear
     assert body[0]["is_default"] is True
     assert all("password" not in p and "secret" not in str(p).lower() or p["name"] for p in body)
-    assert all(set(p.keys()) == {"name", "is_default"} for p in body)
+    assert all(set(p.keys()) == {"name", "is_default", "db_type", "website_schedulable"} for p in body)
+    # dev is sqlite — not schedulable from the dashboard
+    dev = next(p for p in body if p["name"] == "dev")
+    assert dev["db_type"] == "sqlite"
+    assert dev["website_schedulable"] is False
+    # staging is postgres — schedulable from the dashboard
+    staging = next(p for p in body if p["name"] == "staging")
+    assert staging["db_type"] == "postgres"
+    assert staging["website_schedulable"] is True
 
 
 _WAREHOUSE_YAML = "warehouse:\n  type: sqlite\n  path: ./w.db\n"

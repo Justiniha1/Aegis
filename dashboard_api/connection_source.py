@@ -50,3 +50,32 @@ def resolve_profile(yaml_text: str, name: str):
     data = _resolve_env_vars(_parse(yaml_text))
     prof = data.get(name)
     return prof if isinstance(prof, dict) else None
+
+
+# ---------------------------------------------------------------------------
+# Capability helpers — Pattern 3: derive from UNRESOLVED type, never secrets
+# ---------------------------------------------------------------------------
+
+_WEBSITE_SCHEDULABLE_TYPES = {"postgresql", "postgres", "mysql", "mssql", "snowflake"}
+
+
+def profile_types(yaml_text: str) -> dict:
+    """Return a mapping of profile name -> db type string (lowercased, unresolved).
+
+    Uses _parse only — no ${ENV} resolution — so secrets are never read.
+    Internal profiles starting with '_' are excluded (same rule as profile_names).
+    """
+    data = _parse(yaml_text)
+    return {
+        k: str(v.get("type", "")).lower()
+        for k, v in data.items()
+        if isinstance(k, str) and not k.startswith("_") and isinstance(v, dict)
+    }
+
+
+def is_website_schedulable(db_type: str) -> bool:
+    """Return True if the DB type is reachable by the hosted runner (cloud DBs only).
+
+    Derived from the UNRESOLVED YAML type label — never from resolved credentials.
+    """
+    return db_type.lower().rstrip("/") in _WEBSITE_SCHEDULABLE_TYPES

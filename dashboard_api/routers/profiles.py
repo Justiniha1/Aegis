@@ -15,10 +15,23 @@ def list_profiles(
     db: Session = Depends(get_db),
     client: models.Client = Depends(get_client_any_auth),
 ):
-    """List connection profile NAMES (never secrets) from the uploaded or on-disk YAML."""
+    """List connection profile NAMES (never secrets) from the uploaded or on-disk YAML.
+
+    Each profile also carries db_type (unresolved YAML type label) and website_schedulable
+    (derived from db_type via the shared predicate — no ${ENV} resolution, no secrets).
+    """
     yaml_text = connection_source.get_yaml_text(db, client.id)
     names, default = connection_source.profile_names(yaml_text)
-    return [schemas.ProfileOut(name=n, is_default=(n == default)) for n in names]
+    types = connection_source.profile_types(yaml_text)
+    return [
+        schemas.ProfileOut(
+            name=n,
+            is_default=(n == default),
+            db_type=types.get(n, ""),
+            website_schedulable=connection_source.is_website_schedulable(types.get(n, "")),
+        )
+        for n in names
+    ]
 
 
 @router.post("/sync")
