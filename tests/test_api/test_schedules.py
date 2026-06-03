@@ -283,3 +283,80 @@ def test_response_has_no_secrets(client_app):
                     "last_run_at", "next_run_at"}
     extra_keys = set(body.keys()) - allowed_keys
     assert not extra_keys, f"Unexpected keys in ScheduleOut: {extra_keys}"
+
+
+# ---------------------------------------------------------------------------
+# Test (WR-01): PATCH re-derives capability — a downgraded profile is rejected
+# ---------------------------------------------------------------------------
+
+def test_patch_rejects_profile_downgraded_to_non_schedulable(monkeypatch, tmp_path):
+    """If a profile is downgraded to sqlite after its schedule exists, PATCH that would
+    keep it enabled must be rejected with 400 (the create guard alone is not enough)."""
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-32-chars-xxxxxxxxx")
+    conn = tmp_path / "database_connection.yaml"
+    conn.write_text(_YAML, encoding="utf-8")  # staging=postgres (schedulable)
+    monkeypatch.setenv("DQF_CONNECTION_YAML_PATH", str(conn))
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    engine = create_engine(
+        f"sqlite:///{tmp_path}/test.db",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(engine)
+    TestingSession = sessionmaker(bind=engine)
+
+    from dashboard_api.main import app
+
+    def override_get_db():
+        db = TestingSession()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_db] = override_get_db
+    raw_key = "downgrade-test-key"
+    db = TestingSession()
+    db.add(Client(name="dc", email="dc@test.com", api_key_hash=hash_key(raw_key)))
+    db.commit()
+    db.close()
+    headers = {"X-Api-Key": raw_key}
+
+    try:
+        tc = TestClient(app)
+        # Create a schedule while staging is still postgres (schedulable)
+        r = tc.post(
+            "/api/v1/schedules",
+            json={"profile": "staging", "preset": "daily", "at_hour": 6},
+            headers=headers,
+        )
+        assert r.status_code in (200, 201), r.text
+        sched_id = r.json()["id"]
+
+        # Downgrade staging to sqlite (non-schedulable) by rewriting the YAML
+        conn.write_text(
+            "dev:\n  type: sqlite\n  path: x.db\n"
+            "staging:\n  type: sqlite\n  path: y.db\n",
+            encoding="utf-8",
+        )
+
+        # PATCH that leaves the schedule enabled must now be rejected
+        r = tc.patch(
+            f"/api/v1/schedules/{sched_id}",
+            json={"preset": "hourly"},
+            headers=headers,
+        )
+        assert r.status_code == 400, r.text
+        assert "cannot be scheduled" in r.json().get("detail", ""), r.text
+
+        # Pausing (enabled=False) must still be allowed so operators can turn it off
+        r = tc.patch(
+            f"/api/v1/schedules/{sched_id}",
+            json={"enabled": False},
+            headers=headers,
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["enabled"] is False
+    finally:
+        app.dependency_overrides.clear()

@@ -150,6 +150,23 @@ def update_schedule(
     """Enable/pause a schedule or update its preset. 404 on cross-client access."""
     s = _get_schedule_or_404(schedule_id, client, db)
 
+    # Capability re-check (T-09C-02 / WR-01): create_schedule rejects non-schedulable
+    # profiles, but a client can push new YAML downgrading a profile to sqlite/local after
+    # the schedule exists. Re-derive server-side so PATCH cannot keep or resume an active
+    # schedule on a profile that is no longer website-schedulable.
+    will_be_enabled = body.enabled if body.enabled is not None else s.enabled
+    if will_be_enabled:
+        yaml_text = connection_source.get_yaml_text(db, client.id)
+        db_type = connection_source.profile_types(yaml_text).get(s.profile, "")
+        if not connection_source.is_website_schedulable(db_type):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Profile '{s.profile}' cannot be scheduled from the dashboard"
+                    " — schedule it from the client lane instead."
+                ),
+            )
+
     if body.enabled is not None:
         s.enabled = body.enabled
 

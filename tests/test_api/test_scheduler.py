@@ -272,3 +272,85 @@ def test_one_bad_schedule_does_not_kill_loop(tmp_path):
         f"Expected 1 run for 'good' client after 'bad' client exception, got {len(good_runs)}"
     )
     db.close()
+
+
+# ---------------------------------------------------------------------------
+# Test 7 (CR-01): a dispatch failure must not leave the run stuck in QUEUED
+# ---------------------------------------------------------------------------
+
+def test_dispatch_failure_marks_run_failed_not_stuck_queued(tmp_path):
+    """If execute_run dispatch raises, the committed Run is marked FAILED, not left QUEUED.
+
+    A QUEUED row left behind would make the per-client active-run guard suppress every
+    future scheduled run for that client forever (silent deadlock). Regression for CR-01.
+    """
+    Session = _make_db(tmp_path)
+    db = Session()
+    client_id = _add_client(db)
+    _add_schedule(db, client_id=client_id)
+    db.close()
+
+    async def raising_rtp(fn, **kwargs):
+        raise RuntimeError("simulated engine crash")
+
+    with patch.object(_scheduler_mod, "SessionLocal", Session), \
+         patch.object(_scheduler_mod, "run_in_threadpool", side_effect=raising_rtp), \
+         patch.object(_scheduler_mod, "execute_run"):
+        asyncio.run(_scheduler_mod.poll_due_schedules())
+
+    db = Session()
+    runs = db.query(Run).filter(Run.client_id == client_id).all()
+    assert len(runs) == 1, f"Expected 1 run, got {len(runs)}"
+    assert runs[0].status == "FAILED", (
+        f"Dispatch failure must leave the run FAILED, not stuck QUEUED; got {runs[0].status}"
+    )
+    assert runs[0].error_reason, "FAILED run must record an error_reason"
+
+    # The active-run guard must no longer be triggered by this run, so a subsequent
+    # poll can dispatch again (no permanent deadlock).
+    active = db.query(Run).filter(
+        Run.client_id == client_id,
+        Run.status.in_(["QUEUED", "RUNNING"]),
+    ).first()
+    assert active is None, "No QUEUED/RUNNING run should remain after a dispatch failure"
+    db.close()
+
+
+# ---------------------------------------------------------------------------
+# Test 8 (CR-02): last_run_at is not stamped when the active-run guard skips dispatch
+# ---------------------------------------------------------------------------
+
+def test_last_run_at_not_set_when_active_guard_skips(tmp_path):
+    """When the active-run guard suppresses dispatch, last_run_at must stay unchanged.
+
+    Otherwise operators/monitoring see a last_run_at for a run that never happened.
+    Regression for CR-02.
+    """
+    Session = _make_db(tmp_path)
+    db = Session()
+    client_id = _add_client(db)
+    sched_id = _add_schedule(db, client_id=client_id).id
+    db.add(Run(
+        client_id=client_id,
+        profile="staging",
+        type_filter=None,
+        status="RUNNING",
+        total_tests=0,
+        completed_tests=0,
+    ))
+    db.commit()
+    db.close()
+
+    with patch.object(_scheduler_mod, "SessionLocal", Session), \
+         patch.object(_scheduler_mod, "run_in_threadpool", new_callable=AsyncMock), \
+         patch.object(_scheduler_mod, "execute_run"):
+        asyncio.run(_scheduler_mod.poll_due_schedules())
+
+    db = Session()
+    sched_after = db.query(Schedule).filter(Schedule.id == sched_id).first()
+    assert sched_after.last_run_at is None, (
+        "last_run_at must remain unset when the active-run guard suppressed dispatch"
+    )
+    # next_run_at is still advanced to avoid a hot-loop
+    assert sched_after.next_run_at > datetime.utcnow()
+    db.close()

@@ -78,6 +78,7 @@ async def poll_due_schedules() -> None:
                 .first()
             )
 
+            dispatched = False
             if active is None:
                 run = models.Run(
                     client_id=sched.client_id,
@@ -90,18 +91,36 @@ async def poll_due_schedules() -> None:
                 db.add(run)
                 db.commit()
                 db.refresh(run)
-                # Dispatch to the threadpool — execute_run is synchronous.
-                await run_in_threadpool(
-                    execute_run,
-                    run_id=run.id,
-                    client_id=sched.client_id,
-                    profile=sched.profile,
-                    type_filter=None,
-                )
+                try:
+                    # Dispatch to the threadpool — execute_run is synchronous.
+                    await run_in_threadpool(
+                        execute_run,
+                        run_id=run.id,
+                        client_id=sched.client_id,
+                        profile=sched.profile,
+                        type_filter=None,
+                    )
+                except Exception as dispatch_err:
+                    # execute_run is contracted never to raise, but if it does the Run
+                    # row is already committed as QUEUED. Leaving it QUEUED would make the
+                    # active-run guard above suppress every future scheduled run for this
+                    # client forever (silent deadlock). Mark it FAILED so the client is not
+                    # permanently blocked.
+                    db.rollback()
+                    stuck = db.query(models.Run).filter(models.Run.id == run.id).first()
+                    if stuck is not None and stuck.status in ("QUEUED", "RUNNING"):
+                        stuck.status = "FAILED"
+                        stuck.error_reason = f"scheduler dispatch failed: {dispatch_err}"
+                        stuck.completed_at = datetime.utcnow()
+                        db.commit()
+                dispatched = True
 
             # Always roll next_run_at forward — skip-missed, no catch-up burst.
             # Apply even when we skipped due to an active run, so we do not hot-loop.
-            sched.last_run_at = now
+            # last_run_at is stamped only when a run was actually dispatched, so it never
+            # records a run that the active-run guard suppressed.
+            if dispatched:
+                sched.last_run_at = now
             sched.next_run_at = compute_next_run(
                 sched.preset,
                 now=now,
