@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from urllib.parse import quote_plus
 
@@ -5,18 +6,33 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
+_ENV_VAR_PATTERN = re.compile(r"^\$\{([A-Z0-9_]+)\}$")
+
 
 def build_connection_url(profile: dict) -> str:
     """Build a SQLAlchemy URL from a connection profile dict.
 
     Supported types:
-      sqlite      → sqlite:///path/to/db.sqlite
-      postgresql  → postgresql://user:pass@host:port/db
-      mysql       → mysql+pymysql://user:pass@host:port/db
-      mssql       → mssql+pyodbc://user:pass@host:port/db?driver=ODBC+Driver+17+for+SQL+Server
-      other       → uses 'connection_url' field directly
+      sqlite      -> sqlite:///path/to/db.sqlite
+      postgresql  -> postgresql://user:pass@host:port/db
+      mysql       -> mysql+pymysql://user:pass@host:port/db
+      mssql       -> mssql+pyodbc://user:pass@host:port/db?driver=ODBC+Driver+17+for+SQL+Server
+      snowflake   -> snowflake://user:pass@account/db?warehouse=WH&role=R
+      other       -> uses 'connection_url' field directly
     """
     db_type = profile.get("type", "").lower().rstrip("/")
+
+    # Loud-fail on any unresolved ${ENV_VAR} reference before anything else.
+    # The error names only the variable — never its (literal) value.
+    for value in profile.values():
+        if isinstance(value, str):
+            m = _ENV_VAR_PATTERN.match(value)
+            if m:
+                var_name = m.group(1)
+                raise ValueError(
+                    f"Required environment variable {var_name} is not set for this "
+                    "connection profile — set it on the runner before scheduling."
+                )
 
     # Direct URL override — any database
     if "connection_url" in profile:
@@ -52,9 +68,21 @@ def build_connection_url(profile: dict) -> str:
             f"?driver={driver}"
         )
 
+    if db_type == "snowflake":
+        account = str(profile.get("account", "")).strip()
+        if account.endswith(".snowflakecomputing.com"):
+            account = account[: -len(".snowflakecomputing.com")]
+        params = []
+        if profile.get("warehouse"):
+            params.append(f"warehouse={quote_plus(str(profile['warehouse']))}")
+        if profile.get("role"):
+            params.append(f"role={quote_plus(str(profile['role']))}")
+        query = ("?" + "&".join(params)) if params else ""
+        return f"snowflake://{user}:{password}@{account}/{database}{query}"
+
     raise ValueError(
         f"Unsupported database type: '{db_type}'. "
-        "Use one of: sqlite, postgresql, mysql, mssql, or set 'connection_url' directly."
+        "Use one of: sqlite, postgresql, mysql, mssql, snowflake, or set 'connection_url' directly."
     )
 
 
