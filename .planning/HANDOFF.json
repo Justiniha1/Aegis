@@ -1,0 +1,42 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-06-03T03:50:29.021Z",
+  "phase": "09",
+  "phase_name": "multi-runner-scheduling",
+  "phase_dir": ".planning/phases/09-multi-runner-scheduling",
+  "plan": 5,
+  "task": 5,
+  "total_tasks": 5,
+  "status": "phase_complete_awaiting_human_uat_and_merge",
+  "branch": "phase-9-multi-runner-scheduling",
+  "commits_ahead_of_main": 19,
+  "completed_tasks": [
+    {"id": 1, "name": "09-01 Driver/dialect coverage (Snowflake branch, loud unset-ENV fail, hosted drivers, per-DB extras, init template)", "status": "done"},
+    {"id": 2, "name": "09-02 website_schedulable predicate + capability-aware ProfileOut + Settings gating (UX-02)", "status": "done"},
+    {"id": 3, "name": "09-03 Schedule model + compute_next_run/preset_to_cron + tenant-scoped CRUD with capability guard", "status": "done"},
+    {"id": 4, "name": "09-04 scheduler.py poll loop (AEGIS_SCHEDULER_ENABLED, run_in_threadpool->execute_run) + live Settings control", "status": "done"},
+    {"id": 5, "name": "09-05 CLI config simplification + client-lane docs (CLI-01, DOC-01)", "status": "done"}
+  ],
+  "remaining_tasks": [
+    {"id": "uat-1", "name": "Human UAT: Settings browser flow (preset/minute/weekday picker, pause/resume/delete, locked-notice link to /docs/client-lane)", "status": "not_started"},
+    {"id": "uat-2", "name": "Human UAT: live scheduled run fires on Railway with AEGIS_SCHEDULER_ENABLED; appears in run history; missed runs skipped; no duplicates", "status": "not_started"},
+    {"id": "pr", "name": "Open + merge PR for branch phase-9-multi-runner-scheduling (user does this; no auto-push/merge)", "status": "not_started"},
+    {"id": "milestone", "name": "Run /gsd-complete-milestone to archive v1.3 after merge", "status": "not_started"}
+  ],
+  "blockers": [],
+  "human_actions_pending": [
+    {"action": "Run the 2 live-UAT items in 09-HUMAN-UAT.md", "context": "Cannot be verified from code — needs a running dashboard and a live Railway deploy", "blocking": false},
+    {"action": "Open and merge the PR for phase-9-multi-runner-scheduling", "context": "User handles all pushes/merges per standing preference; branch is 19 commits ahead of main, not pushed", "blocking": false},
+    {"action": "On Railway deploy: install new deps (APScheduler==3.11.2, snowflake-sqlalchemy, PyMySQL, tzdata) and set AEGIS_SCHEDULER_ENABLED=1 on exactly one replica", "context": "Scheduler is single-process/single-replica gated; double-enable would double-fire", "blocking": false}
+  ],
+  "decisions": [
+    {"decision": "Executed on a new branch phase-9-multi-runner-scheduling (config branching_strategy was 'none')", "rationale": "Matches the Phase 8 PR pattern + standing no-commit-to-main preference", "phase": "09"},
+    {"decision": "Ran executors sequentially without worktree isolation", "rationale": ".planning is gitignored (gsd-tools commit skips it) + Windows worktree fragility; only Wave 1 had parallelism to gain", "phase": "09"},
+    {"decision": "api_url pinned to a fixed hosted constant; not client-configurable", "rationale": "Product-owner call — the API URL is always the same; only internal AEGIS_API_URL env override remains", "phase": "09"},
+    {"decision": "Removed aegis/config.yaml entirely (CLI fully env-driven; default_profile always 'dev' unless --profile)", "rationale": "Product-owner call — clients should never need a config file", "phase": "09"},
+    {"decision": "Fixed all 10 code-review findings (2 blockers, 5 warnings, 3 info) before completion", "rationale": "CR-01 dispatch-failure deadlock was a real scheduler correctness bug undermining SC5", "phase": "09"}
+  ],
+  "uncommitted_files": [],
+  "next_action": "Run the 2 live-UAT items in 09-HUMAN-UAT.md (Settings browser flow + a Railway scheduled run), then open and merge the PR for phase-9-multi-runner-scheduling, then /gsd-complete-milestone for v1.3.",
+  "context_notes": "Phase 9 is fully implemented, verified (5/5 must-haves), and code-review-clean. 73 tests pass (was 35), frontend tsc clean. ROADMAP/STATE/REQUIREMENTS marked complete. Working tree clean. Nothing is mid-flight — this is a clean pause at completion. The only open work is human/live (UAT) and the user-owned PR merge."
+}
