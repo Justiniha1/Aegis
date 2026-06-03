@@ -9,3 +9,6 @@ pyyaml==6.0.2
 cryptography==43.0.3
 slowapi==0.1.9
 psycopg2-binary>=2.9.9
+PyMySQL==1.2.0
+snowflake-sqlalchemy==1.10.0
+tzdata

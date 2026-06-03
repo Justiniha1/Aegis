@@ -29,6 +29,11 @@ dev = [
     "httpx>=0.27",
     "requests-mock>=1.11",
 ]
+postgres = ["psycopg2-binary>=2.9.9"]
+mysql = ["PyMySQL>=1.2.0"]
+snowflake = ["snowflake-sqlalchemy>=1.10.0"]
+mssql = ["pyodbc>=5.3.0"]
+all-db = ["psycopg2-binary>=2.9.9", "PyMySQL>=1.2.0", "snowflake-sqlalchemy>=1.10.0"]
 
 [tool.setuptools.packages.find]
 where = ["."]
