@@ -40,7 +40,7 @@ Full details: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
 
 ### v1.3 Multi-Runner Execution & Per-Profile Scheduling
 
-- [ ] **Phase 9: Multi-Runner Execution & Per-Profile Scheduling** — DB driver coverage (Snowflake/MySQL/MSSQL), per-profile scheduling capability + Settings UI gating, hosted scheduler for cloud profiles, CLI config simplification, client-lane docs
+- [x] **Phase 9: Multi-Runner Execution & Per-Profile Scheduling** — DB driver coverage (Snowflake/MySQL/MSSQL), per-profile scheduling capability + Settings UI gating, hosted scheduler for cloud profiles, CLI config simplification, client-lane docs — complete 2026-06-03 (branch phase-9-multi-runner-scheduling; pending PR merge + human UAT)
 
 ## Phase Details
 
@@ -52,11 +52,11 @@ Full details: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
 **Plans:** 5 plans (4 waves)
 
 Plans:
-- [ ] 09-01-PLAN.md — Wave A: Snowflake branch in build_connection_url + cloud drivers (hosted pinned + per-DB extras) + loud-fail on unset ${ENV} + Snowflake init template (DB-01, DB-02, DB-03)
-- [ ] 09-02-PLAN.md — Wave B: shared website_schedulable predicate, ProfileOut db_type+capability, Settings schedule-control-vs-locked-notice gating (UX-02)
-- [ ] 09-03-PLAN.md — Wave C.1: Schedule table + compute_next_run/cron presets + tenant-scoped schedules CRUD with 400 capability guardrail (SCHED-01, SCHED-02, SCHED-04)
-- [ ] 09-04-PLAN.md — Wave C.2: in-process AsyncIOScheduler poller (run_in_threadpool + execute_run reuse, AEGIS_SCHEDULER_ENABLED, overlap/skip-missed safety) + Settings schedule control wiring (SCHED-03, SCHED-05)
-- [ ] 09-05-PLAN.md — Wave D: optional aegis/config.yaml + hosted api_url default; client-lane runbook + scheduler/no-Alembic/Snowflake-IP-allowlist caveats (CLI-01, DOC-01)
+- [x] 09-01-PLAN.md — Wave A: Snowflake branch in build_connection_url + cloud drivers (hosted pinned + per-DB extras) + loud-fail on unset ${ENV} + Snowflake init template (DB-01, DB-02, DB-03)
+- [x] 09-02-PLAN.md — Wave B: shared website_schedulable predicate, ProfileOut db_type+capability, Settings schedule-control-vs-locked-notice gating (UX-02)
+- [x] 09-03-PLAN.md — Wave C.1: Schedule table + compute_next_run/cron presets + tenant-scoped schedules CRUD with 400 capability guardrail (SCHED-01, SCHED-02, SCHED-04)
+- [x] 09-04-PLAN.md — Wave C.2: in-process AsyncIOScheduler poller (run_in_threadpool + execute_run reuse, AEGIS_SCHEDULER_ENABLED, overlap/skip-missed safety) + Settings schedule control wiring (SCHED-03, SCHED-05)
+- [x] 09-05-PLAN.md — Wave D: optional aegis/config.yaml + hosted api_url default; client-lane runbook + scheduler/no-Alembic/Snowflake-IP-allowlist caveats (CLI-01, DOC-01)
 
 **Success Criteria** (what must be TRUE):
   1. A `type: snowflake` profile (password via `${ENV}`) runs successfully from the hosted dashboard and a run appears in history
@@ -90,7 +90,7 @@ Plans:
 | 6. Profile Switcher UI | v1.2 | 1/1 | Complete | 2026-05-29 |
 | 7. Railway Deployment | v1.2 | 2/2 | Complete | 2026-05-29 |
 | 8. Connection Profile Sync | v1.2 | — | Complete | 2026-06-02 |
-| 9. Multi-Runner Execution & Scheduling | v1.3 | 0/5 | Planned | - |
+| 9. Multi-Runner Execution & Scheduling | v1.3 | 5/5 | Complete | 2026-06-03 |
 
 ---
 *Roadmap created: 2026-05-07*
