@@ -10,7 +10,7 @@ from dashboard_api.limiter import limiter
 
 from dashboard_api import models
 from dashboard_api.database import engine
-from dashboard_api.routers import auth_routes, clients, profiles, results, runs, tests
+from dashboard_api.routers import auth_routes, clients, profiles, results, runs, schedules, tests
 
 # Create all tables on startup (no-op if they already exist)
 models.Base.metadata.create_all(bind=engine)
@@ -51,6 +51,7 @@ app.include_router(clients.router)
 app.include_router(tests.router)
 app.include_router(runs.router)
 app.include_router(profiles.router)
+app.include_router(schedules.router)
 
 
 @app.get("/api/v1/health", tags=["health"])

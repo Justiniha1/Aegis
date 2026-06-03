@@ -156,3 +156,35 @@ class ProfileOut(BaseModel):
     db_type: str = ""
     website_schedulable: bool = False
 
+
+# ── Schedules (Phase 9) ───────────────────────────────────────────────────────
+
+class ScheduleCreate(BaseModel):
+    profile: str = Field(..., max_length=128)
+    preset: Literal["hourly", "daily", "weekly"]
+    at_hour: int = Field(0, ge=0, le=23)
+    at_minute: int = Field(0, ge=0, le=59)
+    weekday: int = Field(0, ge=0, le=6)
+    enabled: bool = True
+
+
+class ScheduleUpdate(BaseModel):
+    enabled: Optional[bool] = None
+    preset: Optional[Literal["hourly", "daily", "weekly"]] = None
+    at_hour: Optional[int] = Field(None, ge=0, le=23)
+    at_minute: Optional[int] = Field(None, ge=0, le=59)
+    weekday: Optional[int] = Field(None, ge=0, le=6)
+
+
+class ScheduleOut(BaseModel):
+    id: int
+    client_id: int
+    profile: str
+    preset: Optional[str] = None
+    cron: Optional[str] = None
+    enabled: bool
+    last_run_at: Optional[datetime] = None
+    next_run_at: datetime
+
+    model_config = {"from_attributes": True}
+
