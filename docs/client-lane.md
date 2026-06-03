@@ -114,7 +114,7 @@ No `aegis/config.yaml` is needed. The CLI always talks to the hosted dashboard a
 # Upload your connection profile to the dashboard
 aegis push
 
-# Trigger a run (uses default_profile from config.yaml, or "dev" by default)
+# Trigger a run (pass --profile; defaults to "dev" if omitted)
 aegis run --profile my_warehouse
 ```
 

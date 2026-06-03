@@ -35,7 +35,6 @@ def init_cmd():
 
     aegis_dir.mkdir()
 
-    shutil.copy(TEMPLATES_DIR / "config.yaml", aegis_dir / "config.yaml")
     shutil.copy(TEMPLATES_DIR / "test_definitions.yaml", aegis_dir / "test_definitions.yaml")
     (aegis_dir / "database_connection.yaml").write_text(_DATABASE_CONNECTION_YAML)
 

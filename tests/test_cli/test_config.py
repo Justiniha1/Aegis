@@ -2,7 +2,8 @@ import os
 import pytest
 from pathlib import Path
 
-def test_load_config_reads_yaml_and_env(tmp_path, monkeypatch):
+def test_config_yaml_is_fully_ignored(tmp_path, monkeypatch):
+    """config.yaml is no longer read at all: even a present file does not affect config."""
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("AEGIS_API_KEY", "test-key-from-env")
     monkeypatch.delenv("AEGIS_API_URL", raising=False)
@@ -10,13 +11,15 @@ def test_load_config_reads_yaml_and_env(tmp_path, monkeypatch):
 
     aegis_dir = tmp_path / "aegis"
     aegis_dir.mkdir()
-    (aegis_dir / "config.yaml").write_text("default_profile: production\n")
+    # A stray config.yaml with overrides must have no effect.
+    (aegis_dir / "config.yaml").write_text(
+        "api_url: http://evil.example.com\ndefault_profile: production\n"
+    )
 
     from cli.config import load_config
     cfg = load_config()
-    # api_url is fixed regardless of config.yaml; default_profile may still be set in the file.
     assert cfg["api_url"] == "https://api.aegis-dq.com"
-    assert cfg["default_profile"] == "production"
+    assert cfg["default_profile"] == "dev"
     assert cfg["api_key"] == "test-key-from-env"
 
 

@@ -1,4 +1,0 @@
-# Aegis configuration
-# api_url can also be set via AEGIS_API_URL environment variable
-api_url: https://api.aegis-dq.com
-default_profile: production
