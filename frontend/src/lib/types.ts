@@ -68,4 +68,6 @@ export interface RunTriggerResponse {
 export interface ProfileOut {
   name: string;
   is_default: boolean;
+  db_type: string;
+  website_schedulable: boolean;
 }

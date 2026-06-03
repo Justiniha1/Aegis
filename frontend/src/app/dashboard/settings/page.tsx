@@ -62,50 +62,136 @@ export default function SettingsPage() {
             No environments found — add a profile to get started.
           </p>
         ) : (
-          <div className="space-y-1">
+          <div className="space-y-3">
             {profiles.map((p) => {
               const active = selectedProfile === p.name;
               return (
-                <button
-                  key={p.name}
-                  type="button"
-                  onClick={() => setSelectedProfile(p.name)}
-                  className="w-full text-left flex items-center gap-3 px-3 py-2.5 transition-all"
-                  style={{
-                    borderRadius: "6px",
-                    backgroundColor: active ? `${BRAND_TEAL}0F` : "transparent",
-                    opacity: active ? 1 : 0.75,
-                    cursor: "pointer",
-                    border: "none",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!active) (e.currentTarget as HTMLButtonElement).style.opacity = "0.90";
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!active) (e.currentTarget as HTMLButtonElement).style.opacity = "0.75";
-                  }}
-                >
-                  <div
+                <div key={p.name}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProfile(p.name)}
+                    className="w-full text-left flex items-center gap-3 px-3 py-2.5 transition-all"
                     style={{
-                      width: "7px",
-                      height: "7px",
-                      borderRadius: "9999px",
-                      backgroundColor: active ? BRAND_TEAL : palette.textSecondary,
-                      flexShrink: 0,
-                      transition: "background-color 120ms",
+                      borderRadius: "6px",
+                      backgroundColor: active ? `${BRAND_TEAL}0F` : "transparent",
+                      opacity: active ? 1 : 0.75,
+                      cursor: "pointer",
+                      border: "none",
                     }}
-                  />
-                  <span
-                    className="text-body"
-                    style={{
-                      fontFamily: "var(--font-jetbrains-mono)",
-                      color: active ? palette.textPrimary : palette.textSecondary,
-                      fontWeight: active ? 500 : 400,
+                    onMouseEnter={(e) => {
+                      if (!active) (e.currentTarget as HTMLButtonElement).style.opacity = "0.90";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!active) (e.currentTarget as HTMLButtonElement).style.opacity = "0.75";
                     }}
                   >
-                    {p.name}
-                  </span>
-                </button>
+                    <div
+                      style={{
+                        width: "7px",
+                        height: "7px",
+                        borderRadius: "9999px",
+                        backgroundColor: active ? BRAND_TEAL : palette.textSecondary,
+                        flexShrink: 0,
+                        transition: "background-color 120ms",
+                      }}
+                    />
+                    <span
+                      className="text-body"
+                      style={{
+                        fontFamily: "var(--font-jetbrains-mono)",
+                        color: active ? palette.textPrimary : palette.textSecondary,
+                        fontWeight: active ? 500 : 400,
+                      }}
+                    >
+                      {p.name}
+                    </span>
+                  </button>
+
+                  {/* Capability indicator — rendered below the select button row */}
+                  {p.website_schedulable ? (
+                    <div
+                      style={{
+                        marginTop: "4px",
+                        marginLeft: "22px",
+                        padding: "8px 12px",
+                        borderRadius: "6px",
+                        backgroundColor: `${BRAND_TEAL}0A`,
+                        border: `1px solid ${BRAND_TEAL}33`,
+                      }}
+                    >
+                      <p
+                        className="text-caption"
+                        style={{
+                          color: BRAND_TEAL,
+                          fontWeight: 500,
+                          textTransform: "none",
+                          letterSpacing: "0",
+                          marginBottom: "4px",
+                        }}
+                      >
+                        Schedulable from the dashboard
+                      </p>
+                      {/* Wave C mounts the real schedule control into this slot */}
+                      <div
+                        data-schedule-slot={p.name}
+                        style={{
+                          color: palette.textSecondary,
+                          fontSize: "12px",
+                          fontStyle: "italic",
+                        }}
+                      >
+                        Recurring schedule — configure below
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        marginTop: "4px",
+                        marginLeft: "22px",
+                        padding: "8px 12px",
+                        borderRadius: "6px",
+                        backgroundColor: palette.surfaceBg,
+                        border: `1px solid ${palette.borderSubtle}`,
+                      }}
+                    >
+                      <p
+                        className="text-caption"
+                        style={{
+                          color: palette.textSecondary,
+                          fontWeight: 500,
+                          textTransform: "none",
+                          letterSpacing: "0",
+                          marginBottom: "4px",
+                        }}
+                      >
+                        Not schedulable from the dashboard
+                      </p>
+                      <p
+                        className="text-caption"
+                        style={{
+                          color: palette.textSecondary,
+                          textTransform: "none",
+                          letterSpacing: "0",
+                          marginBottom: "6px",
+                        }}
+                      >
+                        This profile points at data the hosted runner cannot reach (for example a
+                        local SQLite file). Schedule it from your own environment instead.
+                      </p>
+                      <a
+                        href="/docs/client-lane"
+                        style={{
+                          color: BRAND_TEAL,
+                          fontSize: "12px",
+                          textDecoration: "underline",
+                          cursor: "pointer",
+                        }}
+                      >
+                        How to schedule from the client lane
+                      </a>
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
