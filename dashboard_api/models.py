@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, JSON, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from dashboard_api.database import Base
@@ -84,3 +84,27 @@ class ConnectionConfig(Base):
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=False, unique=True, index=True)
     yaml_text = Column(Text, nullable=False, default="")
     updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Schedule(Base):
+    __tablename__ = "schedules"
+
+    id = Column(Integer, primary_key=True)
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False, index=True)
+    profile = Column(String, nullable=False)
+    cron = Column(String, nullable=True)              # canonical UTC cron, human-inspectable
+    interval_seconds = Column(Integer, nullable=True) # reserved; presets use cron
+    preset = Column(String, nullable=True)            # "hourly"|"daily"|"weekly"
+    at_hour = Column(Integer, nullable=True)
+    at_minute = Column(Integer, nullable=True, default=0)
+    weekday = Column(Integer, nullable=True)          # 0=Mon for weekly
+    enabled = Column(Boolean, nullable=False, default=True)
+    last_run_at = Column(DateTime, nullable=True)
+    next_run_at = Column(DateTime, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_schedules_due", "enabled", "next_run_at"),
+        UniqueConstraint("client_id", "profile", name="uq_schedule_client_profile"),
+    )
