@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,8 +13,42 @@ from dashboard_api import models
 from dashboard_api.database import engine
 from dashboard_api.routers import auth_routes, clients, profiles, results, runs, schedules, tests
 
-# Create all tables on startup (no-op if they already exist)
-models.Base.metadata.create_all(bind=engine)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """FastAPI lifespan: create tables then optionally start the scheduler.
+
+    Single-process requirement: the Dockerfile CMD is already single-process/single-replica.
+    AEGIS_SCHEDULER_ENABLED=1 (the default) starts the in-process poller here.
+    Set AEGIS_SCHEDULER_ENABLED=0 (or any value other than "1") to disable — this is the
+    seam for future graduation to a dedicated worker process or to disable polling in test
+    environments that do not want a background thread.
+    """
+    # Create all tables on startup (no-op if they already exist).
+    models.Base.metadata.create_all(bind=engine)
+
+    if os.getenv("AEGIS_SCHEDULER_ENABLED", "1") == "1":
+        from dashboard_api.scheduler import start_scheduler
+        from dashboard_api.database import SessionLocal
+        start_scheduler()
+        # Count enabled schedules for the startup log so operators can verify rehydration.
+        db = SessionLocal()
+        try:
+            n = db.query(models.Schedule).filter(models.Schedule.enabled == True).count()  # noqa: E712
+        finally:
+            db.close()
+        print(
+            f"[scheduler] enabled — single in-process poller (60s); "
+            f"rehydrated {n} enabled schedule(s)"
+        )
+    else:
+        print("[scheduler] disabled (AEGIS_SCHEDULER_ENABLED != 1)")
+
+    yield
+
+    from dashboard_api.scheduler import stop_scheduler
+    stop_scheduler()
+
 
 # CORS: read allowed origins from env var; default to localhost:3000 for local dev.
 # Production: set ALLOWED_ORIGINS=https://dashboard.yourdomain.com
@@ -27,6 +62,7 @@ app = FastAPI(
     title="DQF Dashboard API",
     description="Receives test results from client backend engines and serves them to the dashboard.",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # Rate limiting — per-client quota on run-trigger endpoint

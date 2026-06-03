@@ -12,3 +12,4 @@ psycopg2-binary>=2.9.9
 PyMySQL==1.2.0
 snowflake-sqlalchemy==1.10.0
 tzdata
+APScheduler==3.11.2
