@@ -5,15 +5,16 @@ from pathlib import Path
 def test_load_config_reads_yaml_and_env(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("AEGIS_API_KEY", "test-key-from-env")
+    monkeypatch.delenv("AEGIS_API_URL", raising=False)
+    monkeypatch.setattr("cli.config.load_dotenv", lambda: None)
 
     aegis_dir = tmp_path / "aegis"
     aegis_dir.mkdir()
-    (aegis_dir / "config.yaml").write_text(
-        "api_url: https://api.aegis-dq.com\ndefault_profile: production\n"
-    )
+    (aegis_dir / "config.yaml").write_text("default_profile: production\n")
 
     from cli.config import load_config
     cfg = load_config()
+    # api_url is fixed regardless of config.yaml; default_profile may still be set in the file.
     assert cfg["api_url"] == "https://api.aegis-dq.com"
     assert cfg["default_profile"] == "production"
     assert cfg["api_key"] == "test-key-from-env"
@@ -22,6 +23,7 @@ def test_load_config_reads_yaml_and_env(tmp_path, monkeypatch):
 def test_load_config_without_file_uses_defaults(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("AEGIS_API_KEY", "test-key-defaults")
+    monkeypatch.delenv("AEGIS_API_URL", raising=False)
     monkeypatch.setattr("cli.config.load_dotenv", lambda: None)
 
     from cli.config import load_config
@@ -31,14 +33,28 @@ def test_load_config_without_file_uses_defaults(tmp_path, monkeypatch):
     assert cfg["api_key"] == "test-key-defaults"
 
 
-def test_load_config_file_overrides_defaults(tmp_path, monkeypatch):
+def test_config_yaml_cannot_override_api_url(tmp_path, monkeypatch):
+    """The hosted api_url is fixed: a value in config.yaml must be ignored."""
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("AEGIS_API_KEY", "test-key-override")
+    monkeypatch.delenv("AEGIS_API_URL", raising=False)
     monkeypatch.setattr("cli.config.load_dotenv", lambda: None)
 
     aegis_dir = tmp_path / "aegis"
     aegis_dir.mkdir()
-    (aegis_dir / "config.yaml").write_text("api_url: http://localhost:8000\n")
+    (aegis_dir / "config.yaml").write_text("api_url: http://evil.example.com\n")
+
+    from cli.config import load_config
+    cfg = load_config()
+    assert cfg["api_url"] == "https://api.aegis-dq.com"
+
+
+def test_aegis_api_url_env_override_for_internal_dev(tmp_path, monkeypatch):
+    """AEGIS_API_URL is the only supported override (internal dev), not config.yaml."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("AEGIS_API_KEY", "test-key-dev")
+    monkeypatch.setenv("AEGIS_API_URL", "http://localhost:8000")
+    monkeypatch.setattr("cli.config.load_dotenv", lambda: None)
 
     from cli.config import load_config
     cfg = load_config()

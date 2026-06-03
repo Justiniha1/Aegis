@@ -55,6 +55,7 @@ type ScheduleControlProps = {
 type CreateState = {
   preset: "hourly" | "daily" | "weekly";
   at_hour: number;
+  at_minute: number;
   weekday: number;
 };
 
@@ -69,6 +70,7 @@ function ScheduleControl({
   const [createState, setCreateState] = useState<CreateState>({
     preset: "daily",
     at_hour: 6,
+    at_minute: 0,
     weekday: 0,
   });
   const [busy, setBusy] = useState(false);
@@ -82,7 +84,7 @@ function ScheduleControl({
         profile: profileName,
         preset: createState.preset,
         at_hour: createState.preset !== "hourly" ? createState.at_hour : undefined,
-        at_minute: 0,
+        at_minute: createState.preset !== "hourly" ? createState.at_minute : undefined,
         weekday: createState.preset === "weekly" ? createState.weekday : undefined,
       };
       await createSchedule(body, token);
@@ -219,7 +221,28 @@ function ScheduleControl({
             >
               {Array.from({ length: 24 }, (_, i) => (
                 <option key={i} value={i}>
-                  {String(i).padStart(2, "0")}:00 UTC
+                  {String(i).padStart(2, "0")} UTC
+                </option>
+              ))}
+            </select>
+            <span style={labelStyle}>Minute:</span>
+            <select
+              value={createState.at_minute}
+              onChange={(e) =>
+                setCreateState((s) => ({ ...s, at_minute: parseInt(e.target.value, 10) }))
+              }
+              style={{
+                fontSize: "12px",
+                padding: "2px 4px",
+                borderRadius: "4px",
+                border: `1px solid ${palette.borderSubtle}`,
+                backgroundColor: palette.surfaceElevated,
+                color: palette.textPrimary,
+              }}
+            >
+              {[0, 5, 10, 15, 20, 30, 45].map((m) => (
+                <option key={m} value={m}>
+                  {String(m).padStart(2, "0")}
                 </option>
               ))}
             </select>

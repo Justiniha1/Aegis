@@ -29,4 +29,9 @@ RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "60"))
 # Pre-built limit string consumed by @limiter.limit() in routers/runs.py
 RUNS_LIMIT_STRING = f"{RATE_LIMIT_RUNS}/{RATE_LIMIT_WINDOW}second"
 
+# Schedule mutations (create/update/delete) are cheap but should not be cycled rapidly.
+# RATE_LIMIT_SCHEDULES: max schedule mutations per window (default 20).
+RATE_LIMIT_SCHEDULES = int(os.getenv("RATE_LIMIT_SCHEDULES", "20"))
+SCHEDULES_LIMIT_STRING = f"{RATE_LIMIT_SCHEDULES}/{RATE_LIMIT_WINDOW}second"
+
 limiter = Limiter(key_func=_api_key_or_ip)

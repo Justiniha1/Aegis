@@ -4,6 +4,12 @@ from pathlib import Path
 import yaml
 from dotenv import load_dotenv
 
+# The hosted Aegis API URL is fixed — every client talks to the same endpoint, so it is
+# never a client-facing setting. AEGIS_API_URL exists only as an internal override for
+# Aegis-side development (e.g. pointing the CLI at a local server); it is intentionally
+# NOT configurable via aegis/config.yaml.
+DEFAULT_API_URL = "https://api.aegis-dq.com"
+
 
 def load_config() -> dict:
     load_dotenv()
@@ -20,6 +26,8 @@ def load_config() -> dict:
         sys.exit(1)
 
     cfg["api_key"] = api_key
-    cfg.setdefault("api_url", "https://api.aegis-dq.com")
+    # api_url is fixed: any value in config.yaml is ignored. Only the internal
+    # AEGIS_API_URL env override is honored, so clients never need to set it.
+    cfg["api_url"] = os.environ.get("AEGIS_API_URL", DEFAULT_API_URL)
     cfg.setdefault("default_profile", "dev")
     return cfg

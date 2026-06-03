@@ -34,7 +34,13 @@ def build_connection_url(profile: dict) -> str:
                     "connection profile — set it on the runner before scheduling."
                 )
 
-    # Direct URL override — any database
+    # Direct URL override — advanced escape hatch for any database/driver.
+    # NOTE (IN-02): the ${ENV} loud-fail above only matches a field whose ENTIRE value is
+    # "${VAR}", so an env reference embedded inside a connection_url (e.g.
+    # "postgresql://u:${PW}@h/db") is NOT auto-resolved or guarded, and a hardcoded password
+    # here is accepted as-is. This is intentional — connection_url is for users who need full
+    # control. For credential safety prefer the structured fields (type/host/username/password
+    # with password set to a standalone "${VAR}"), which do get the unset-env loud-fail.
     if "connection_url" in profile:
         return profile["connection_url"]
 

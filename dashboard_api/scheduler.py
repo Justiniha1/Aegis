@@ -128,6 +128,7 @@ async def poll_due_schedules() -> None:
                 at_minute=sched.at_minute or 0,
                 weekday=sched.weekday or 0,
             )
+            sched.updated_at = now
             db.commit()
 
         except Exception as e:

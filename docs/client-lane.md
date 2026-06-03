@@ -105,12 +105,8 @@ DB_USER=readonly_user
 DB_PASSWORD=yourpassword
 ```
 
-No `aegis/config.yaml` is needed. The CLI defaults `api_url` to `https://api.aegis-dq.com`.
-If you are running against a self-hosted instance, create `aegis/config.yaml` and set:
-
-```yaml
-api_url: https://your-instance.up.railway.app
-```
+No `aegis/config.yaml` is needed. The CLI always talks to the hosted dashboard at
+`https://api.aegis-dq.com` — the API URL is fixed and not a client-facing setting.
 
 ### 4. Push your profile and run
 

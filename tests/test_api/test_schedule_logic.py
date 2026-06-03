@@ -92,4 +92,8 @@ def test_to_cron_canonical():
 
     assert preset_to_cron("hourly") == "0 * * * *"
     assert preset_to_cron("daily", at_hour=6, at_minute=0) == "0 6 * * *"
+    assert preset_to_cron("daily", at_hour=6, at_minute=30) == "30 6 * * *"
+    # Monday (Python weekday 0) -> cron dow 1
     assert preset_to_cron("weekly", at_hour=6, at_minute=0, weekday=0) == "0 6 * * 1"
+    # Sunday (Python weekday 6) -> cron dow 0, NOT the non-standard 7 (WR-02)
+    assert preset_to_cron("weekly", at_hour=6, at_minute=0, weekday=6) == "0 6 * * 0"

@@ -10,13 +10,14 @@ Security invariants:
 """
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from dashboard_api import connection_source, models, schemas
 from dashboard_api.auth import get_client_any_auth
 from dashboard_api.database import get_db
+from dashboard_api.limiter import limiter, SCHEDULES_LIMIT_STRING
 from dashboard_api.schedule_logic import compute_next_run, preset_to_cron
 
 router = APIRouter(prefix="/api/v1/schedules", tags=["schedules"])
@@ -38,7 +39,9 @@ def _get_schedule_or_404(schedule_id: int, client: models.Client, db: Session) -
 
 
 @router.post("", response_model=schemas.ScheduleOut, status_code=201)
+@limiter.limit(SCHEDULES_LIMIT_STRING)
 def create_schedule(
+    request: Request,
     body: schemas.ScheduleCreate,
     client: models.Client = Depends(get_client_any_auth),
     db: Session = Depends(get_db),
@@ -46,11 +49,18 @@ def create_schedule(
     """Create a new recurring schedule for a profile owned by the authenticated client.
 
     Failure paths:
+    - Unparseable connection config -> 400 "Cannot read connection config: ..."
     - Unknown profile -> 400 "profile '{p}' not found"
     - Non-schedulable profile (sqlite/local) -> 400 with cannot-be-scheduled message
     - Duplicate (client, profile) -> 409 "This profile already has a schedule."
     """
     yaml_text = connection_source.get_yaml_text(db, client.id)
+
+    # Distinguish a corrupt config from a genuinely-absent profile (WR-03), so the client
+    # is not told their profile "does not exist" when the real problem is invalid YAML.
+    cfg_error = connection_source.parse_error(yaml_text)
+    if cfg_error:
+        raise HTTPException(status_code=400, detail=f"Cannot read connection config: {cfg_error}")
 
     # Validate profile exists in this client's YAML (T-09C-04)
     names, _ = connection_source.profile_names(yaml_text)
@@ -141,7 +151,9 @@ def get_schedule(
 
 
 @router.patch("/{schedule_id}", response_model=schemas.ScheduleOut)
+@limiter.limit(SCHEDULES_LIMIT_STRING)
 def update_schedule(
+    request: Request,
     schedule_id: int,
     body: schemas.ScheduleUpdate,
     client: models.Client = Depends(get_client_any_auth),
@@ -208,7 +220,9 @@ def update_schedule(
 
 
 @router.delete("/{schedule_id}", status_code=204)
+@limiter.limit(SCHEDULES_LIMIT_STRING)
 def delete_schedule(
+    request: Request,
     schedule_id: int,
     client: models.Client = Depends(get_client_any_auth),
     db: Session = Depends(get_db),

@@ -12,17 +12,19 @@ def preset_to_cron(preset: str, at_hour: int = 0, at_minute: int = 0, weekday: i
     """Return a canonical UTC cron string for the given preset.
 
     hourly  -> "0 * * * *"
-    daily   -> "0 {at_hour} * * *"         (at_minute always 0 in v1.3)
-    weekly  -> "0 {at_hour} * * {weekday+1}"  (cron weekday: 1=Mon..7=Sun, we add 1 to 0-indexed)
+    daily   -> "{at_minute} {at_hour} * * *"
+    weekly  -> "{at_minute} {at_hour} * * {dow}"
+
+    Cron day-of-week field uses the portable 0-6 range (0=Sunday..6=Saturday). Python's
+    weekday() is 0=Monday..6=Sunday, so we map dow = (weekday + 1) % 7. This keeps Monday=1
+    and maps Sunday to 0 rather than the non-standard 7 that some cron parsers reject.
     """
     if preset == "hourly":
         return "0 * * * *"
     if preset == "daily":
         return f"{at_minute} {at_hour} * * *"
     if preset == "weekly":
-        # cron weekday: 1=Monday, 7=Sunday (some use 0=Sunday but standard is 1=Monday)
-        # We follow the standard where 1=Monday to match weekday=0 (Mon) -> cron 1
-        cron_weekday = weekday + 1
+        cron_weekday = (weekday + 1) % 7
         return f"{at_minute} {at_hour} * * {cron_weekday}"
     raise ValueError(
         f"Unknown preset '{preset}'. Allowed presets: {sorted(_ALLOWED_PRESETS)}"

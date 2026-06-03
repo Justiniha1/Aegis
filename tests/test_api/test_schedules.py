@@ -155,6 +155,57 @@ def test_create_unknown_profile_rejected(client_app):
 
 
 # ---------------------------------------------------------------------------
+# Test (WR-03): corrupt YAML reports a config error, not "profile not found"
+# ---------------------------------------------------------------------------
+
+def test_malformed_config_reports_parse_error(monkeypatch, tmp_path):
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-32-chars-xxxxxxxxx")
+    conn = tmp_path / "database_connection.yaml"
+    # Invalid YAML (unclosed bracket / bad indentation)
+    conn.write_text("staging:\n  type: postgres\n   host: [unclosed\n", encoding="utf-8")
+    monkeypatch.setenv("DQF_CONNECTION_YAML_PATH", str(conn))
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    engine = create_engine(
+        f"sqlite:///{tmp_path}/test.db",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(engine)
+    TestingSession = sessionmaker(bind=engine)
+
+    from dashboard_api.main import app
+
+    def override_get_db():
+        db = TestingSession()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_db] = override_get_db
+    raw_key = "malformed-test-key"
+    db = TestingSession()
+    db.add(Client(name="mc", email="mc@test.com", api_key_hash=hash_key(raw_key)))
+    db.commit()
+    db.close()
+
+    try:
+        tc = TestClient(app)
+        r = tc.post(
+            "/api/v1/schedules",
+            json={"profile": "staging", "preset": "daily", "at_hour": 6},
+            headers={"X-Api-Key": raw_key},
+        )
+        assert r.status_code == 400, r.text
+        detail = r.json().get("detail", "")
+        assert "connection config" in detail.lower(), f"Expected a config parse error, got: {detail}"
+        assert "not found" not in detail.lower(), "Corrupt YAML must not be reported as 'profile not found'"
+    finally:
+        app.dependency_overrides.clear()
+
+
+# ---------------------------------------------------------------------------
 # Test: duplicate (client, profile) -> 409
 # ---------------------------------------------------------------------------
 
