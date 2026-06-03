@@ -9,12 +9,10 @@ def load_config() -> dict:
     load_dotenv()
 
     config_path = Path("aegis") / "config.yaml"
-    if not config_path.exists():
-        print("[aegis] aegis/config.yaml not found. Run 'aegis init' to set up your project.")
-        sys.exit(1)
-
-    with open(config_path, "r") as f:
-        cfg = yaml.safe_load(f) or {}
+    cfg = {}
+    if config_path.exists():
+        with open(config_path, "r") as f:
+            cfg = yaml.safe_load(f) or {}
 
     api_key = os.environ.get("AEGIS_API_KEY")
     if not api_key:
