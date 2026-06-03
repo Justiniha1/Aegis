@@ -71,3 +71,31 @@ export interface ProfileOut {
   db_type: string;
   website_schedulable: boolean;
 }
+
+export interface Schedule {
+  id: number;
+  client_id: number;
+  profile: string;
+  preset: string | null;
+  cron: string | null;
+  enabled: boolean;
+  last_run_at: string | null;
+  next_run_at: string;
+}
+
+export interface ScheduleCreate {
+  profile: string;
+  preset: "hourly" | "daily" | "weekly";
+  at_hour?: number;
+  at_minute?: number;
+  weekday?: number;
+  enabled?: boolean;
+}
+
+export interface ScheduleUpdate {
+  enabled?: boolean;
+  preset?: "hourly" | "daily" | "weekly";
+  at_hour?: number;
+  at_minute?: number;
+  weekday?: number;
+}

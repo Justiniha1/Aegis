@@ -1,4 +1,4 @@
-import type { Run, RunTriggerResponse, ProfileOut } from "./types";
+import type { Run, RunTriggerResponse, ProfileOut, Schedule, ScheduleCreate, ScheduleUpdate } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -67,4 +67,22 @@ export async function listRuns(limit: number, token: string): Promise<Run[]> {
 
 export async function listProfiles(token: string): Promise<ProfileOut[]> {
   return apiGet("/api/v1/profiles", token) as Promise<ProfileOut[]>;
+}
+
+/* ── Phase 9 — Schedule wrappers ──────────────────────────────────────── */
+
+export async function listSchedules(token: string): Promise<Schedule[]> {
+  return apiGet("/api/v1/schedules", token) as Promise<Schedule[]>;
+}
+
+export async function createSchedule(body: ScheduleCreate, token: string): Promise<Schedule> {
+  return apiPost("/api/v1/schedules", body, token) as Promise<Schedule>;
+}
+
+export async function updateSchedule(id: number, body: ScheduleUpdate, token: string): Promise<Schedule> {
+  return request("PATCH", `/api/v1/schedules/${id}`, token, body) as Promise<Schedule>;
+}
+
+export async function deleteSchedule(id: number, token: string): Promise<void> {
+  await apiDelete(`/api/v1/schedules/${id}`, token);
 }
