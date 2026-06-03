@@ -12,6 +12,16 @@ _DATABASE_CONNECTION_YAML = """\
 dev:
   type: sqlite
   path: ./data/your_database.db
+
+# Snowflake example (uncomment + fill in; password MUST be a ${ENV} reference):
+# warehouse:
+#   type: snowflake
+#   account: myorg-myacct        # org-account locator only — no .snowflakecomputing.com
+#   username: ${SNOWFLAKE_USER}
+#   password: ${SNOWFLAKE_PASSWORD}
+#   database: ANALYTICS
+#   warehouse: COMPUTE_WH
+#   role: TRANSFORMER
 """
 
 

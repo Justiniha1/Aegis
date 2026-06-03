@@ -5,9 +5,21 @@
 #   SQLite:     sqlite:////absolute/path/to/database.db
 #   PostgreSQL: postgresql://user:password@host:5432/dbname
 #   MySQL:      mysql+pymysql://user:password@host:3306/dbname
+#   Snowflake:  snowflake://user:password@account/database?warehouse=WH&role=R
 #
 # For SQLite inside Docker, use the container-side absolute path.
+# Secrets must use ${ENV_VAR} references (never hard-code passwords here).
 
 dev:
   type: sqlite
   connection_url: sqlite:////app/data/raw/sample_ecommerce.db
+
+# Snowflake example (uncomment + fill in; password MUST be a ${ENV} reference):
+# warehouse:
+#   type: snowflake
+#   account: myorg-myacct        # org-account locator only — no .snowflakecomputing.com
+#   username: ${SNOWFLAKE_USER}
+#   password: ${SNOWFLAKE_PASSWORD}
+#   database: ANALYTICS
+#   warehouse: COMPUTE_WH
+#   role: TRANSFORMER
