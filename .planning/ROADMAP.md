@@ -2,14 +2,15 @@
 
 ## Milestones
 
-- ✅ **v1.0 Demo Readiness** — Phases 1–2 (shipped 2026-05-22)
-- ✅ **v1.1 First Client: Airflow Integration** — Phases 3–4 (shipped 2026-05-26)
-- 🔄 **v1.2 First Client Handoff** — Phases 5–8 (Phase 8 pending merge)
+- **v1.0 Demo Readiness** — Phases 1–2 (shipped 2026-05-22)
+- **v1.1 First Client: Airflow Integration** — Phases 3–4 (shipped 2026-05-26)
+- **v1.2 First Client Handoff** — Phases 5–8 (shipped 2026-06-02) — see [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
+- **v1.3 Multi-Runner Execution & Per-Profile Scheduling** — Phase 9 (planned 2026-06-02)
 
 ## Phases
 
 <details>
-<summary>✅ v1.0 Demo Readiness (Phases 1–2) — SHIPPED 2026-05-22</summary>
+<summary>v1.0 Demo Readiness (Phases 1–2) — SHIPPED 2026-05-22</summary>
 
 - [x] Phase 1: Demo Readiness (7/7 plans) — signed off 2026-05-17
 - [x] Phase 1.1: Frontend Design Pass (INSERTED) (6/6 plans) — signed off 2026-05-17
@@ -18,90 +19,63 @@
 </details>
 
 <details>
-<summary>✅ v1.1 First Client: Airflow Integration (Phases 3–4) — SHIPPED 2026-05-26</summary>
+<summary>v1.1 First Client: Airflow Integration (Phases 3–4) — SHIPPED 2026-05-26</summary>
 
 - [x] Phase 3: Package + Airflow (3/3 plans) — complete 2026-05-24
 - [x] Phase 4: Production Hardening (2/2 plans) — complete 2026-05-26
 
 </details>
 
-### v1.2 First Client Handoff
+<details>
+<summary>v1.2 First Client Handoff (Phases 5–8) — SHIPPED 2026-06-02</summary>
 
-- [x] **Phase 5: SDK Reliability** — `run_checks()` timeout parameter + operator passthrough (complete 2026-05-27)
-- [x] **Phase 6: Profile Switcher UI** — Settings page component for selecting active connection profile (complete 2026-05-29)
-- [x] **Phase 7: Railway Deployment** — per-service `railway.toml` ×3, `DEPLOY.md` runbook, post-deploy checklist (complete 2026-05-29)
-- [x] **Phase 8: Connection Profile Sync** — file-driven profiles: `aegis push` → `POST /api/v1/profiles/sync`, selector-only Settings, server runs resolve via engine resolver (complete on branch `phase-8-profile-sync` 2026-06-01; **pending merge**)
+- [x] Phase 5: SDK Reliability (3/3 plans) — complete 2026-05-27
+- [x] Phase 6: Profile Switcher UI (1/1 plan) — complete 2026-05-29
+- [x] Phase 7: Railway Deployment (2/2 plans) — complete 2026-05-29
+- [x] Phase 8: Connection Profile Sync (file-driven; built on branch) — merged 2026-06-02 (PR #3)
+
+Full details: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
+
+</details>
+
+### v1.3 Multi-Runner Execution & Per-Profile Scheduling
+
+- [ ] **Phase 9: Multi-Runner Execution & Per-Profile Scheduling** — DB driver coverage (Snowflake/MySQL/MSSQL), per-profile scheduling capability + Settings UI gating, hosted scheduler for cloud profiles, CLI config simplification, client-lane docs
 
 ## Phase Details
 
-### Phase 5: SDK Reliability
-**Goal**: Airflow users can set a hard deadline on `run_checks()` so DAG tasks never hang indefinitely
-**Depends on**: Phase 4 (production-hardened API, `run_checks()` and `AegisDQOperator` exist)
-**Requirements**: SDK-01, SDK-02
-**Success Criteria** (what must be TRUE):
-  1. `run_checks(max_wait_seconds=60)` raises `AegisDQRunTimeout` if the run has not reached a terminal state within 60 seconds
-  2. `run_checks()` called without `max_wait_seconds` continues to poll indefinitely (backward-compatible)
-  3. `AegisDQOperator(max_wait_seconds=120)` passes the timeout through to `run_checks()` without modification
-  4. `AegisDQOperator` exposes `max_wait_seconds` as a Jinja-templatable field so DAG authors can parameterise it
-**Plans**: 3 plans (2 waves)
-Plans:
-
-**Wave 1**
-- [ ] 05-01-PLAN.md — Add AegisDQRunTimeout exception and wire max_wait_seconds through _client.py and _run.py
-
-**Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 05-02-PLAN.md — Unit tests for AegisDQRunTimeout timeout behavior (TDD)
-- [ ] 05-03-PLAN.md — Add max_wait_seconds to AegisDQOperator constructor, template_fields, and execute()
-
-Cross-cutting constraints:
-- `max_wait_seconds: int | None = None` default is the same across all three plans (no breaking change)
-
-### Phase 6: Profile Switcher UI
-**Goal**: Operators with multiple connection profiles can pick the active profile from the Settings page before triggering a run
-**Depends on**: Phase 2 (profiles endpoint exists, run context in place), Phase 4 (Docker env vars stable)
-**Requirements**: UX-01
-**Success Criteria** (what must be TRUE):
-  1. The Settings page shows all available connection profiles fetched from the API
-  2. Operator can click a profile to mark it active; the selection is reflected in the run context
-  3. A subsequent run trigger from the TopBar uses the selected profile, not a hardcoded default
-  4. Active profile selection persists across page navigations within the session
-**Plans**: 1 plan (1 wave)
+### Phase 9: Multi-Runner Execution & Per-Profile Scheduling
+**Goal**: A cloud-reachable profile (Snowflake/Postgres/etc.) can be scheduled to run automatically from the dashboard; profiles that can't be scheduled from the website say so honestly and point to the client lane; the client setup needed to self-run the engine is minimal.
+**Depends on**: Phase 8 (file-driven profiles, `connection_source`), Phase 2 (`execute_run` server-side run path), Phase 7 (Railway hosted deploy)
+**Requirements**: DB-01, DB-02, DB-03, UX-02, CLI-01, SCHED-01, SCHED-02, SCHED-03, SCHED-04, SCHED-05, DOC-01
+**Design**: docs/superpowers/specs/2026-06-02-execution-scheduling-model-design.md
+**Plans:** 5 plans (4 waves)
 
 Plans:
+- [ ] 09-01-PLAN.md — Wave A: Snowflake branch in build_connection_url + cloud drivers (hosted pinned + per-DB extras) + loud-fail on unset ${ENV} + Snowflake init template (DB-01, DB-02, DB-03)
+- [ ] 09-02-PLAN.md — Wave B: shared website_schedulable predicate, ProfileOut db_type+capability, Settings schedule-control-vs-locked-notice gating (UX-02)
+- [ ] 09-03-PLAN.md — Wave C.1: Schedule table + compute_next_run/cron presets + tenant-scoped schedules CRUD with 400 capability guardrail (SCHED-01, SCHED-02, SCHED-04)
+- [ ] 09-04-PLAN.md — Wave C.2: in-process AsyncIOScheduler poller (run_in_threadpool + execute_run reuse, AEGIS_SCHEDULER_ENABLED, overlap/skip-missed safety) + Settings schedule control wiring (SCHED-03, SCHED-05)
+- [ ] 09-05-PLAN.md — Wave D: optional aegis/config.yaml + hosted api_url default; client-lane runbook + scheduler/no-Alembic/Snowflake-IP-allowlist caveats (CLI-01, DOC-01)
 
-**Wave 1**
-- [x] 06-01-PLAN.md — Extend RunContext with profilesLoading/profilesError; update settings/page.tsx (opacity, state branches, labels, error copy)
-
-### Phase 7: Railway Deployment
-**Goal**: The project owner can deploy Aegis to Railway in under 15 minutes by following the README runbook
-**Depends on**: Phase 5, Phase 6 (all v1.2 features complete before owner handoff)
-**Requirements**: DEPLOY-03, DEPLOY-04, DEPLOY-05
 **Success Criteria** (what must be TRUE):
-  1. Following the README runbook, `railway.toml` provisions a Railway project with `api`, `frontend`, and `engine` services pre-configured — no code changes required (no public one-click button; reduced per D-07)
-  2. After setting the documented env vars, `https://<project>.railway.app` serves the Aegis dashboard login page
-  3. `railway.toml` correctly specifies Dockerfile paths, start commands, and port bindings for all three services
-  4. The README post-deploy checklist covers: required env vars, creating the first client account, and pointing an Airflow worker at the live API URL
-**Plans**: 2 plans (2 waves)
+  1. A `type: snowflake` profile (password via `${ENV}`) runs successfully from the hosted dashboard and a run appears in history
+  2. From Settings, an operator creates a recurring (preset) schedule on a website-schedulable profile, and the hosted scheduler runs it on time with results in run history
+  3. A SQLite/local profile shows an honest locked notice in Settings (no schedule control) with a working link to the client-lane docs, and its schedule API call is rejected
+  4. The `aegis` CLI runs without an `aegis/config.yaml` present — `api_url` defaults to the hosted dashboard; only `AEGIS_API_KEY` + `database_connection.yaml` are needed to self-run
+  5. The scheduler is safe by construction: single in-process scheduler gated by `AEGIS_SCHEDULER_ENABLED`, `Schedule` table survives restarts, no overlapping/duplicate runs, missed-during-downtime runs are skipped
 
-Plans:
+**Waves** (internal; B's read-only half parallel with A):
+- **Wave A — Drivers/dialects**: Snowflake branch in `build_connection_url` + drivers in engine & hosted image + per-DB extras (DB-01, DB-02, DB-03)
+- **Wave B — Capability API + Settings UI**: `website_schedulable` derived from unresolved `db_type`; toggle vs locked-notice (UX-02)
+- **Wave C — Schedule model + CRUD + hosted scheduler**: `Schedule` table, schedules router (guardrail + tenant scoping), APScheduler in lifespan via `execute_run`/`run_in_threadpool` (SCHED-01..05)
+- **Wave D — CLI config simplification + client-lane docs**: `api_url` default + optional `config.yaml`; client-lane runbook + caveats (CLI-01, DOC-01)
 
-**Wave 1**
-- [x] 07-01-PLAN.md — Add psycopg2-binary to api requirements + write the three per-service railway.toml (api/frontend/engine)
-
-**Wave 2** *(blocked on Wave 1 completion)*
-- [x] 07-02-PLAN.md — Write DEPLOY.md runbook (provisioning, env vars, two-step URL wiring, post-deploy checklist) + link it from README.md
-
-### Phase 8: Connection Profile Sync
-**Goal**: One source of truth for connection profiles, synced from local YAML to the dashboard, with no secrets in tracked files or the database
-**Depends on**: Phase 6 (Settings profile selector), Phase 7 (Railway deploy target)
-**Status**: Complete on branch `phase-8-profile-sync` (2026-06-01); **NOT merged, NOT pushed**
-**Outcome** (final, file-driven model — supersedes the original structured/encrypted design at `docs/superpowers/{specs,plans}/2026-06-01-profile-sync*`):
-  1. Profiles defined in `backend/config/database_connection.yaml` (names + `${ENV}` secrets); one source of truth
-  2. `aegis push` uploads the YAML to `POST /api/v1/profiles/sync`, stored per-client; dashboard prefers uploaded YAML over disk (`dashboard_api/connection_source.py`)
-  3. `GET /api/v1/profiles` returns `{name, is_default}` only; Settings page is selector-only (no CRUD)
-  4. Server-side runs resolve connections via the engine's own resolver (`backend/core/config_loader.py`) — fixes the relative-SQLite-path "unable to open database file" bug
-  5. Secrets stay as `${ENV}` resolved at run time — no Fernet encryption, `AEGIS_ENCRYPTION_KEY` removed
-**Note**: tracked outside `.planning/phases/` (no `08-` dir); built directly on the branch. Audit H-1 fixed (trigger validates against `connection_source`). Browser UAT of the selector-only Settings still pending user confirmation.
+**Cross-cutting constraints** (from design spec — locked):
+- Laptop-local data = no website scheduler (client lane only)
+- Hosted/website runs only reach cloud-reachable DBs
+- The Airflow/client lane is client-owned (Aegis ships the operator + docs, not a scheduler)
+- Open-decision defaults applied (password auth, document IP-allowlist limit, cron presets, defer hosted MSSQL, skip missed runs, one schedule per profile)
 
 ## Progress
 
@@ -115,8 +89,9 @@ Plans:
 | 5. SDK Reliability | v1.2 | 3/3 | Complete | 2026-05-27 |
 | 6. Profile Switcher UI | v1.2 | 1/1 | Complete | 2026-05-29 |
 | 7. Railway Deployment | v1.2 | 2/2 | Complete | 2026-05-29 |
-| 8. Connection Profile Sync | v1.2 | — | Complete (pending merge) | 2026-06-01 |
+| 8. Connection Profile Sync | v1.2 | — | Complete | 2026-06-02 |
+| 9. Multi-Runner Execution & Scheduling | v1.3 | 0/5 | Planned | - |
 
 ---
 *Roadmap created: 2026-05-07*
-*Last updated: 2026-06-02 — Phase 7 marked complete; Phase 8 (profile sync, file-driven) recorded as complete-on-branch*
+*Last updated: 2026-06-02 — v1.3 milestone started; Phase 9 (Multi-Runner Execution & Per-Profile Scheduling) planned (5 plans, 4 waves)*
