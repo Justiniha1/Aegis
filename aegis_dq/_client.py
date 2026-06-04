@@ -8,6 +8,11 @@ import os
 import time
 import requests
 
+# The hosted Aegis API URL is fixed — every client talks to the same endpoint, so it is
+# never a client-facing setting. AEGIS_API_URL exists only as an internal override (for
+# Aegis-side development and demos pointing at a different deployment).
+DEFAULT_API_URL = "https://aegis-production-fa56.up.railway.app"
+
 
 class AegisAPIClient:
     """Thin HTTP wrapper that reads credentials from environment variables.
@@ -23,12 +28,8 @@ class AegisAPIClient:
         api_url: str | None = None,
         api_key: str | None = None,
     ) -> None:
-        self._base = (api_url or os.getenv("AEGIS_API_URL", "")).rstrip("/")
+        self._base = (api_url or os.getenv("AEGIS_API_URL") or DEFAULT_API_URL).rstrip("/")
         self._key = api_key or os.getenv("AEGIS_API_KEY", "")
-        if not self._base:
-            raise ValueError(
-                "AEGIS_API_URL is required. Set the environment variable or pass api_url=."
-            )
         if not self._key:
             raise ValueError(
                 "AEGIS_API_KEY is required. Set the environment variable or pass api_key=."

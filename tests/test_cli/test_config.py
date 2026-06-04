@@ -18,7 +18,7 @@ def test_config_yaml_is_fully_ignored(tmp_path, monkeypatch):
 
     from cli.config import load_config
     cfg = load_config()
-    assert cfg["api_url"] == "https://api.aegis-dq.com"
+    assert cfg["api_url"] == "https://aegis-production-fa56.up.railway.app"
     assert cfg["default_profile"] == "dev"
     assert cfg["api_key"] == "test-key-from-env"
 
@@ -31,7 +31,7 @@ def test_load_config_without_file_uses_defaults(tmp_path, monkeypatch):
 
     from cli.config import load_config
     cfg = load_config()
-    assert cfg["api_url"] == "https://api.aegis-dq.com"
+    assert cfg["api_url"] == "https://aegis-production-fa56.up.railway.app"
     assert cfg["default_profile"] == "dev"
     assert cfg["api_key"] == "test-key-defaults"
 
@@ -49,7 +49,7 @@ def test_config_yaml_cannot_override_api_url(tmp_path, monkeypatch):
 
     from cli.config import load_config
     cfg = load_config()
-    assert cfg["api_url"] == "https://api.aegis-dq.com"
+    assert cfg["api_url"] == "https://aegis-production-fa56.up.railway.app"
 
 
 def test_aegis_api_url_env_override_for_internal_dev(tmp_path, monkeypatch):

@@ -2,10 +2,10 @@ import os
 import sys
 from dotenv import load_dotenv
 
-# The hosted Aegis API URL is fixed — every client talks to the same endpoint, so it is
-# never a client-facing setting. AEGIS_API_URL exists only as an internal override for
-# Aegis-side development (e.g. pointing the CLI at a local server).
-DEFAULT_API_URL = "https://api.aegis-dq.com"
+from aegis_dq._client import DEFAULT_API_URL
+
+# api_url is fixed and shared with the SDK (single source of truth: aegis_dq._client).
+# AEGIS_API_URL exists only as an internal override for Aegis-side development.
 
 
 def load_config() -> dict:
