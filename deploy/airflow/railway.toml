@@ -1,0 +1,8 @@
+# deploy/airflow/railway.toml
+# Railway config for the demo Airflow service (build context = repo root).
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "deploy/airflow/Dockerfile"
+
+[deploy]
+restartPolicyType = "ON_FAILURE"

@@ -1,0 +1,60 @@
+# deploy/demo/aegis/test_definitions.yaml
+# Minimal, guaranteed-green test set for the Airflow demo.
+# Every check passes against deploy/demo/db/seed_demo.sql.
+engine: Simple
+settings:
+  default_profile: demo
+  default_severity: MEDIUM
+  alerts:
+    enabled: false
+    slack:
+      enabled: false
+      webhook_url: ""
+      notify_on: []
+    email:
+      enabled: false
+      recipients: []
+      notify_on: []
+tests:
+- name: Customer Email Null Check
+  description: Every customer has an email address
+  type: null_check
+  severity: HIGH
+  table: customers
+  column: email
+  threshold: 0
+- name: Customer ID Uniqueness
+  description: customer_id is unique (primary key)
+  type: unique_check
+  severity: CRITICAL
+  table: customers
+  column: customer_id
+- name: Customer Row Count
+  description: Customers table is populated
+  type: row_count
+  severity: MEDIUM
+  table: customers
+  min_rows: 1
+  max_rows: 100000
+  timeframe: all_time
+- name: Orders Reference Valid Customers
+  description: Every order points at a real customer
+  type: relationship_check
+  severity: CRITICAL
+  source_table: orders
+  source_column: customer_id
+  target_table: customers
+  target_column: customer_id
+  max_orphans: 0
+- name: Customers Schema Validation
+  description: customers table has the expected columns
+  type: schema_check
+  severity: HIGH
+  table: customers
+  expected_columns:
+    customer_id: integer
+    first_name: string
+    last_name: string
+    email: string
+    signup_date: date
+    country: string

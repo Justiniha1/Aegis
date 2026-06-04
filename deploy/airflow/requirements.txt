@@ -1,0 +1,3 @@
+# deploy/airflow/requirements.txt
+# Installed into the demo Airflow image so the AegisDQOperator imports.
+# Build context is the repo root; the local package is installed by the Dockerfile.

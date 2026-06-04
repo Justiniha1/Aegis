@@ -1,0 +1,17 @@
+# deploy/demo/aegis/database_connection.yaml
+# Demo profile for the Aegis Airflow sales demo.
+# Pushed to the demo client account via `aegis push` (see docs/airflow-demo-runbook.md).
+# The ${DEMO_DB_*} vars are resolved server-side on the api service at run time.
+
+demo:
+  type: postgres
+  host: ${DEMO_DB_HOST}
+  port: 5432
+  database: ${DEMO_DB_NAME}
+  username: ${DEMO_DB_USER}
+  password: ${DEMO_DB_PASSWORD}
+  schema: public
+  connect_args:
+    sslmode: require
+    connect_timeout: 10
+    application_name: aegis-demo
