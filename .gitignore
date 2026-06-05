@@ -3,12 +3,17 @@ __pycache__/
 *.py[cod]
 *.pyo
 *.egg-info/
+build/
+dist/
 data/processed/
 .env
 dashboard.db
 db_data/
 test_check.db
 .pytest_cache/
+
+# CLI-scaffolded end-user state (aegis init) — not product source
+/aegis/
 
 # Claude Code & GSD
 .claude/
