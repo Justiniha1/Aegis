@@ -50,7 +50,9 @@ def run_cmd(
         typer.echo("\r", nl=False)
 
         if state == "COMPLETE":
-            typer.echo(f"\n[aegis] Run #{run_id} complete — {total}/{total} tests passed.")
+            # COMPLETE means the run finished, not that every test passed — the run
+            # dict carries no pass count, so report tests run and point at the dashboard.
+            typer.echo(f"\n[aegis] Run #{run_id} complete — {total} tests run. See the dashboard for pass/fail detail.")
             return
         if state == "FAILED":
             typer.echo(f"\n[aegis] Run #{run_id} failed: {status.get('error_reason', 'unknown error')}")

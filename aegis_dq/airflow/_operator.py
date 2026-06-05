@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
-from airflow.models import BaseOperator
+from airflow.models import BaseOperator, Variable
 
 from aegis_dq._run import AegisDQChecksFailed, run_checks
 
@@ -63,29 +63,21 @@ class AegisDQOperator(BaseOperator):
         self._airflow_var_api_url = airflow_var_api_url
         self._airflow_var_api_key = airflow_var_api_key
 
-    def _resolve_api_url(self) -> str | None:
-        """Resolve API URL: constructor arg > Airflow Variable > env var (env read in AegisAPIClient)."""
-        if self._api_url:
-            return self._api_url
-        if self._airflow_var_api_url:
-            try:
-                from airflow.models import Variable
-                return Variable.get(self._airflow_var_api_url, default_var=None)
-            except Exception:
-                pass
-        return None  # AegisAPIClient will read AEGIS_API_URL from env
+    @staticmethod
+    def _resolve(direct: str | None, airflow_var: str | None) -> str | None:
+        """Resolve a credential: constructor arg > Airflow Variable > None.
 
-    def _resolve_api_key(self) -> str | None:
-        """Resolve API key: constructor arg > Airflow Variable > env var (env read in AegisAPIClient)."""
-        if self._api_key:
-            return self._api_key
-        if self._airflow_var_api_key:
+        Returning None lets AegisAPIClient fall back to the AEGIS_API_URL /
+        AEGIS_API_KEY env vars. Used for both api_url and api_key.
+        """
+        if direct:
+            return direct
+        if airflow_var:
             try:
-                from airflow.models import Variable
-                return Variable.get(self._airflow_var_api_key, default_var=None)
+                return Variable.get(airflow_var, default_var=None)
             except Exception:
                 pass
-        return None  # AegisAPIClient will read AEGIS_API_KEY from env
+        return None
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
         """Execute the data-quality run.
@@ -102,8 +94,8 @@ class AegisDQOperator(BaseOperator):
             "AegisDQOperator: triggering run for profile '%s'", self.profile
         )
 
-        resolved_url = self._resolve_api_url()
-        resolved_key = self._resolve_api_key()
+        resolved_url = self._resolve(self._api_url, self._airflow_var_api_url)
+        resolved_key = self._resolve(self._api_key, self._airflow_var_api_key)
 
         try:
             result = run_checks(
