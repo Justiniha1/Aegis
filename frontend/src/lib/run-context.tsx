@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
 import type { RunStatus, ProfileOut, TestResult } from "./types";
 import { triggerRun as apiTriggerRun, getRun, listProfiles, apiGet } from "./api";
+import { countByStatus, latestRunResults } from "./format";
 import { useAuth } from "./auth";
 
 const PROFILE_STORAGE_KEY = "aegis_active_profile";
@@ -80,13 +81,10 @@ export function RunProvider({ children }: { children: React.ReactNode }) {
     apiGet("/api/v1/results?limit=500", token)
       .then((results: unknown) => {
         if (!Array.isArray(results) || results.length === 0) return;
-        const typedResults = results as TestResult[];
-        const latestRunId = typedResults[0].run_id;
-        const latest = latestRunId != null
-          ? typedResults.filter((r) => r.run_id === latestRunId)
-          : typedResults.filter((r) => r.run_at === typedResults[0].run_at);
-        setPassingCount(latest.filter((r) => r.status === "PASSED").length);
-        setWarningCount(latest.filter((r) => r.status !== "PASSED").length);
+        const latest = latestRunResults(results as TestResult[]);
+        const c = countByStatus(latest);
+        setPassingCount(c.passed);
+        setWarningCount(c.total - c.passed);
       })
       .catch(() => {});
   }, [token, lastCompleted]);

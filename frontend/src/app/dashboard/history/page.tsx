@@ -16,6 +16,7 @@ import {
   STATUS_PALETTE,
   BRAND_TEAL,
 } from "@/lib/constants";
+import { countByStatus } from "@/lib/format";
 import type { TestResult, RunSummary } from "@/lib/types";
 
 export default function HistoryPage() {
@@ -46,19 +47,16 @@ export default function HistoryPage() {
       map.set(r.run_id, existing);
     }
     const summaries: RunSummary[] = Array.from(map.entries())
-      .map(([run_id, items]) => ({
-        run_id,
-        run_at: items[0].run_at,
-        total: items.length,
-        passed: items.filter((i) => i.status === "PASSED").length,
-        failed: items.filter((i) => i.status === "FAILED").length,
-        errors: items.filter((i) => i.status === "ERROR").length,
-      }))
+      .map(([run_id, items]) => {
+        const c = countByStatus(items);
+        return { run_id, run_at: items[0].run_at, total: c.total, passed: c.passed, failed: c.failed, errors: c.errors };
+      })
       .sort((a, b) => b.run_id - a.run_id);
     return { runMap: map, runs: summaries };
   }, [results]);
 
   const selectedResults = selectedRun != null ? runMap.get(selectedRun) || [] : [];
+  const selectedRunSummary = runs.find((r) => r.run_id === selectedRun);
 
   if (loading || authLoading) {
     return (
@@ -172,11 +170,11 @@ export default function HistoryPage() {
                     className="text-heading"
                     style={{ color: palette.textPrimary }}
                   >
-                    Run at <span style={{ fontFamily: "var(--font-jetbrains-mono)" }}>{selectedRun != null ? new Date(runs.find((r) => r.run_id === selectedRun)?.run_at ?? "").toLocaleString() : ""}</span>
+                    Run at <span style={{ fontFamily: "var(--font-jetbrains-mono)" }}>{selectedRunSummary ? new Date(selectedRunSummary.run_at).toLocaleString() : ""}</span>
                   </h2>
                   <div className="flex gap-4 mt-1 text-caption" style={{ textTransform: "none", letterSpacing: "0" }}>
                     {(() => {
-                      const run = runs.find((r) => r.run_id === selectedRun);
+                      const run = selectedRunSummary;
                       if (!run) return null;
                       return (
                         <>
@@ -223,7 +221,7 @@ export default function HistoryPage() {
                         >
                           {r.test_name}
                         </td>
-                        <td className="px-4 py-3"><TypePill type={r.test_type} dark={dark} /></td>
+                        <td className="px-4 py-3"><TypePill type={r.test_type} /></td>
                         <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
                         <td className="px-4 py-3"><SeverityBadge severity={r.severity} /></td>
                         <td

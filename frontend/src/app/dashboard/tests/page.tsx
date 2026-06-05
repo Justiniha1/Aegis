@@ -26,10 +26,13 @@ function extractColumns(t: TestDefinition): string {
   return "—";
 }
 
-const TEST_TYPES = [
-  "null_check", "duplicate_check", "unique_check", "row_count",
-  "schema_check", "range_check", "relationship_check", "custom_sql",
-];
+// Single source of truth for the builtin type keys — derived from TYPE_LABELS
+// so adding a type in constants.ts flows through here automatically.
+const TEST_TYPES = Object.keys(TYPE_LABELS);
+
+// Test types that take a single `column` field (drive both the form's field
+// visibility and the config/YAML builders). Defined once to prevent drift.
+const COLUMN_TYPES = ["null_check", "range_check", "unique_check", "duplicate_check", "relationship_check"];
 
 /* ══════════════════════════════════════════════════════════════════════════ */
 export default function TestsPage() {
@@ -259,7 +262,7 @@ function TestTable({
                   </td>
 
                   {/* Type — TypePill */}
-                  <td className="px-4 py-3"><TypePill type={t.type} dark={dark} /></td>
+                  <td className="px-4 py-3"><TypePill type={t.type} /></td>
 
                   {/* Table — mono, verbatim per D-10 */}
                   <td
@@ -602,7 +605,7 @@ function buildYamlPreview(f: {
   if (f.profile && f.profile !== "dev") lines.push(`profile: ${f.profile}`);
 
   if (f.type !== "custom_sql" && f.table) lines.push(`table: ${f.table}`);
-  if (["null_check", "range_check", "unique_check", "duplicate_check", "relationship_check"].includes(f.type) && f.column) {
+  if (COLUMN_TYPES.includes(f.type) && f.column) {
     lines.push(`column: ${f.column}`);
   }
   if (f.type === "null_check" && f.threshold) lines.push(`threshold: ${f.threshold}`);
@@ -735,7 +738,7 @@ function CreateTestForm({ token, dark, onCreated }: { token: string; dark: boole
     setSubmitting(true);
     const config: Record<string, unknown> = {};
     if (table) config.table = table;
-    if (column && ["null_check", "range_check", "unique_check", "duplicate_check", "relationship_check"].includes(type)) config.column = column;
+    if (column && COLUMN_TYPES.includes(type)) config.column = column;
     if (threshold && type === "null_check") config.threshold = parseFloat(threshold);
     if (type === "range_check") {
       if (minValue) config.min_value = parseFloat(minValue);
@@ -764,7 +767,7 @@ function CreateTestForm({ token, dark, onCreated }: { token: string; dark: boole
     }
   };
 
-  const showColumn = ["null_check", "range_check", "unique_check", "duplicate_check", "relationship_check"].includes(type);
+  const showColumn = COLUMN_TYPES.includes(type);
   const showThreshold = type === "null_check";
   const showRangeMinMax = type === "range_check";
   const showRowCount = type === "row_count";

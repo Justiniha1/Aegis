@@ -25,11 +25,8 @@ const PRESET_LABELS: Record<string, string> = {
 
 function formatUtc(iso: string | null): string {
   if (!iso) return "never";
-  try {
-    return new Date(iso + (iso.endsWith("Z") ? "" : "Z")).toUTCString();
-  } catch {
-    return iso;
-  }
+  // new Date(...) never throws (it yields "Invalid Date"), so no try/catch is needed.
+  return new Date(iso + (iso.endsWith("Z") ? "" : "Z")).toUTCString();
 }
 
 function presetSummary(s: Schedule): string {

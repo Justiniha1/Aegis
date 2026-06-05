@@ -30,6 +30,7 @@ import {
   TypePill,
   StatusDot,
 } from "@/components/StatusBadge";
+import { countByStatus, latestRunResults, formatMetricValue } from "@/lib/format";
 import type { TestResult, TestDefinition } from "@/lib/types";
 
 /* ── colour helpers ───────────────────────────────────────────────────────── */
@@ -167,15 +168,7 @@ export default function DashboardPage() {
   const tableFor = (r: TestResult): string =>
     r.table || derivedTableMap.get(r.test_name) || r.test_name;
 
-  const latestResults = useMemo(() => {
-    if (results.length === 0) return [];
-    const latestRunId = results[0].run_id;
-    if (latestRunId == null) {
-      const latestRun = results[0].run_at;
-      return results.filter((r) => r.run_at === latestRun);
-    }
-    return results.filter((r) => r.run_id === latestRunId);
-  }, [results]);
+  const latestResults = useMemo(() => latestRunResults(results), [results]);
 
   const chartResults = useMemo(() => {
     let base = latestResults;
@@ -185,30 +178,14 @@ export default function DashboardPage() {
     return base;
   }, [latestResults, severityFilter, statusFilter]);
 
-  const summary = useMemo(() => {
-    let passed = 0, failed = 0, errors = 0, skipped = 0;
-    for (const r of latestResults) {
-      if (r.status === "PASSED") passed++;
-      else if (r.status === "FAILED") failed++;
-      else if (r.status === "ERROR") errors++;
-      else skipped++;
-    }
-    return { total: latestResults.length, passed, failed, errors, skipped };
-  }, [latestResults]);
+  const summary = useMemo(() => countByStatus(latestResults), [latestResults]);
 
   const prevSummary = useMemo(() => {
     // Find the second-distinct run_id in the results array (already sorted newest-first).
     const latestId = results[0]?.run_id ?? null;
     const prevId = results.find((r) => r.run_id !== latestId && r.run_id != null)?.run_id ?? null;
     if (prevId == null) return null;
-    const prev = results.filter((r) => r.run_id === prevId);
-    let passed = 0, failed = 0, errors = 0;
-    for (const r of prev) {
-      if (r.status === "PASSED") passed++;
-      else if (r.status === "FAILED") failed++;
-      else if (r.status === "ERROR") errors++;
-    }
-    return { total: prev.length, passed, failed, errors };
+    return countByStatus(results.filter((r) => r.run_id === prevId));
   }, [results]);
 
   const typeChartData = useMemo(() => {
@@ -865,7 +842,7 @@ function ResultsTable({
                     </td>
 
                     {/* Type column — TypePill */}
-                    <td className="px-4 py-3"><TypePill type={r.test_type} dark={dark} /></td>
+                    <td className="px-4 py-3"><TypePill type={r.test_type} /></td>
 
                     {/* Table cell — mono */}
                     <td
@@ -957,11 +934,7 @@ function ResultsTable({
                                   style={{ color: palette.textPrimary }}
                                   title={typeof val === "object" ? JSON.stringify(val) : String(val)}
                                 >
-                                  {typeof val === "number"
-                                    ? val < 1 && val > 0
-                                      ? `${(val * 100).toFixed(1)}%`
-                                      : val.toLocaleString()
-                                    : String(val)}
+                                  {formatMetricValue(val)}
                                 </p>
                               </div>
                             ))}
@@ -1088,11 +1061,7 @@ function DetailCard({ result: r, sqlQuery }: { result: TestResult; sqlQuery?: st
                 style={{ color: palette.textPrimary }}
                 title={typeof val === "object" ? JSON.stringify(val) : String(val)}
               >
-                {typeof val === "number"
-                  ? val < 1 && val > 0
-                    ? `${(val * 100).toFixed(1)}%`
-                    : val.toLocaleString()
-                  : String(val)}
+                {formatMetricValue(val)}
               </p>
             </div>
           ))}
