@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
+import { useRunContext } from "@/lib/run-context";
 import { apiGet, apiGetText, apiDelete, apiPost, apiPut } from "@/lib/api";
 import { SeverityBadge, TypePill } from "@/components/StatusBadge";
 import {
@@ -711,11 +712,12 @@ function TestFormLabel({
 /* ── Create Form ──────────────────────────────────────────────────────────── */
 function CreateTestForm({ token, dark, onCreated }: { token: string; dark: boolean; onCreated: () => void }) {
   const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
+  const { profiles } = useRunContext();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState("null_check");
   const [severity, setSeverity] = useState("MEDIUM");
-  const [profile, setProfile] = useState("dev");
+  const [profile, setProfile] = useState("");
   const [table, setTable] = useState("");
   const [column, setColumn] = useState("");
   const [threshold, setThreshold] = useState("");
@@ -729,6 +731,15 @@ function CreateTestForm({ token, dark, onCreated }: { token: string; dark: boole
   const [expectedColumns, setExpectedColumns] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Default the profile to the client's default (or first) real profile once the
+  // file-driven profile list loads — never a hardcoded guess. Leaves an explicit
+  // user choice untouched.
+  useEffect(() => {
+    if (!profile && profiles.length > 0) {
+      setProfile((profiles.find((p) => p.is_default) ?? profiles[0]).name);
+    }
+  }, [profiles, profile]);
 
   const formState = { name, description, type, severity, profile, table, column, threshold, query, minRows, maxRows, minValue, maxValue, refTable, refColumn, expectedColumns };
 
@@ -818,9 +829,12 @@ function CreateTestForm({ token, dark, onCreated }: { token: string; dark: boole
               <div>
                 <TestFormLabel dark={dark}>Profile</TestFormLabel>
                 <TestFormSelect dark={dark} value={profile} onChange={(e) => setProfile(e.target.value)}>
-                  <option value="dev">dev</option>
-                  <option value="staging">staging</option>
-                  <option value="prod">prod</option>
+                  {profiles.length === 0 && <option value="">No profiles available</option>}
+                  {profiles.map((p) => (
+                    <option key={p.name} value={p.name}>
+                      {p.name}{p.is_default ? " (default)" : ""}
+                    </option>
+                  ))}
                 </TestFormSelect>
               </div>
             </div>
