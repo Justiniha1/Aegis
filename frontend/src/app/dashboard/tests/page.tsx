@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
+import { useRunContext } from "@/lib/run-context";
 import { apiGet, apiGetText, apiDelete, apiPost, apiPut } from "@/lib/api";
 import { SeverityBadge, TypePill } from "@/components/StatusBadge";
 import {
@@ -13,7 +14,7 @@ import {
   NEUTRAL_SCALE,
   STATUS_PALETTE,
 } from "@/lib/constants";
-import type { TestDefinition } from "@/lib/types";
+import type { TestDefinition, ProfileOut } from "@/lib/types";
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 function extractTable(t: TestDefinition): string {
@@ -35,6 +36,7 @@ const TEST_TYPES = [
 export default function TestsPage() {
   const { token, isLoading: authLoading } = useAuth();
   const { theme } = useTheme();
+  const { selectedProfile, profiles } = useRunContext();
   const dark = theme === "dark";
   const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
   const router = useRouter();
@@ -156,7 +158,7 @@ export default function TestsPage() {
 
       {/* Create form */}
       {showCreate && activeTab === "table" && (
-        <CreateTestForm token={token!} dark={dark} onCreated={() => { setShowCreate(false); fetchTests(); }} />
+        <CreateTestForm token={token!} dark={dark} initialProfile={selectedProfile ?? "dev"} profiles={profiles} onCreated={() => { setShowCreate(false); fetchTests(); }} />
       )}
 
       {/* Tab content */}
@@ -706,13 +708,13 @@ function TestFormLabel({
 }
 
 /* ── Create Form ──────────────────────────────────────────────────────────── */
-function CreateTestForm({ token, dark, onCreated }: { token: string; dark: boolean; onCreated: () => void }) {
+function CreateTestForm({ token, dark, initialProfile, profiles, onCreated }: { token: string; dark: boolean; initialProfile: string; profiles: ProfileOut[]; onCreated: () => void }) {
   const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState("null_check");
   const [severity, setSeverity] = useState("MEDIUM");
-  const [profile, setProfile] = useState("dev");
+  const [profile, setProfile] = useState(initialProfile);
   const [table, setTable] = useState("");
   const [column, setColumn] = useState("");
   const [threshold, setThreshold] = useState("");
@@ -815,9 +817,10 @@ function CreateTestForm({ token, dark, onCreated }: { token: string; dark: boole
               <div>
                 <TestFormLabel dark={dark}>Profile</TestFormLabel>
                 <TestFormSelect dark={dark} value={profile} onChange={(e) => setProfile(e.target.value)}>
-                  <option value="dev">dev</option>
-                  <option value="staging">staging</option>
-                  <option value="prod">prod</option>
+                  {profiles.length > 0
+                    ? profiles.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)
+                    : [<option key="dev" value="dev">dev</option>, <option key="staging" value="staging">staging</option>, <option key="prod" value="prod">prod</option>]
+                  }
                 </TestFormSelect>
               </div>
             </div>
