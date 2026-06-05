@@ -6,6 +6,7 @@ from dashboard_api import models, schemas
 from dashboard_api.auth import get_client_any_auth
 from dashboard_api.database import get_db
 from dashboard_api.run_executor import execute_run
+from dashboard_api.queries import enabled_tests_query, active_run
 from dashboard_api import connection_source
 
 router = APIRouter(prefix="/api/v1/runs", tags=["runs"])
@@ -44,17 +45,7 @@ def _to_run_out(r: models.Run) -> schemas.RunOut:
 
 def _compute_total_tests(profile: str, type_filter: list[str] | None, client_id: int, db: Session) -> int:
     """Count enabled TestDefinitions for this client matching profile + optional type_filter."""
-    q = (
-        db.query(models.TestDefinition)
-        .filter(
-            models.TestDefinition.client_id == client_id,
-            models.TestDefinition.enabled == True,  # noqa: E712 (SQLAlchemy comparison)
-            models.TestDefinition.profile == profile,
-        )
-    )
-    if type_filter:
-        q = q.filter(models.TestDefinition.type.in_(type_filter))
-    return q.count()
+    return enabled_tests_query(db, client_id, profile, type_filter).count()
 
 
 @router.post("", response_model=schemas.RunTriggerOut, status_code=202)
@@ -109,15 +100,7 @@ def trigger_run(
 
     # Concurrency policy (D-09): the frontend dedupes triggers, but defend in depth.
     # If this client already has an ACTIVE (QUEUED or RUNNING) run, reject with 409.
-    active = (
-        db.query(models.Run)
-        .filter(
-            models.Run.client_id == client.id,
-            models.Run.status.in_(["QUEUED", "RUNNING"]),
-        )
-        .first()
-    )
-    if active is not None:
+    if active_run(db, client.id) is not None:
         raise HTTPException(
             status_code=409,
             detail="A run is already in progress",

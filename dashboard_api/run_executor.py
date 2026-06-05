@@ -14,7 +14,6 @@ Boundary contract:
   D-17-compliant error_reason. The function never raises.
 - run_id is threaded into result_handler so per-test results join cleanly.
 """
-import json
 import re
 import traceback
 import unicodedata
@@ -23,14 +22,11 @@ from typing import Optional
 
 from dashboard_api import models
 from dashboard_api.database import SessionLocal
+# Reuse the single numpy/pandas-scalar JSON sanitizer (np.int64 etc. -> native Python)
+# rather than maintaining a byte-for-byte copy here.
+from backend.core.result_handler import _sanitize as _sanitize_metrics
 
 _MAX_ERROR_REASON_LEN = 500
-
-
-def _sanitize_metrics(metrics: dict) -> dict:
-    """Convert numpy/pandas scalar types to native Python before SQLAlchemy JSON serialization.
-    Custom SQL tests return np.int64/np.float64 values that SQLite's JSON column can't store."""
-    return json.loads(json.dumps(metrics, default=lambda x: x.item() if hasattr(x, "item") else str(x)))
 
 
 def _sanitize_error(s: str) -> str:
@@ -93,11 +89,11 @@ def execute_run(
     It never raises — all exceptions are converted to Run.FAILED with sanitized reason text.
     """
     from backend.core.config_loader import (
-        DQFConfig, EngineConfig, TestDefinition as EngineTestDef,
-        _name_to_id, _deduplicate_test_ids,
+        DQFConfig, EngineConfig, build_engine_test, _deduplicate_test_ids,
     )
     from backend.core.test_engine import TestEngine
     from dashboard_api import connection_source
+    from dashboard_api.queries import enabled_tests_query
 
     db = SessionLocal()
     try:
@@ -132,14 +128,12 @@ def execute_run(
         )
 
         # Load tests from DB filtered by profile — each profile is a distinct DB environment.
-        db_tests_q = db.query(models.TestDefinition).filter(
-            models.TestDefinition.client_id == client_id,
-            models.TestDefinition.enabled == True,  # noqa: E712
-            models.TestDefinition.profile == profile,
+        # Same filter as the pre-flight count in runs.py, via the shared query builder.
+        db_test_rows = (
+            enabled_tests_query(db, client_id, profile, type_filter)
+            .order_by(models.TestDefinition.created_at.asc())
+            .all()
         )
-        if type_filter:
-            db_tests_q = db_tests_q.filter(models.TestDefinition.type.in_(type_filter))
-        db_test_rows = db_tests_q.order_by(models.TestDefinition.created_at.asc()).all()
 
         if not db_test_rows:
             run.status = "FAILED"
@@ -151,28 +145,18 @@ def execute_run(
             db.commit()
             return
 
-        engine_tests = []
-        for t in db_test_rows:
-            raw = {
-                "name": t.name,
-                "type": t.type,
-                "severity": t.severity,
-                "profile": t.profile,
-                "enabled": t.enabled,
-                "tags": t.tags or [],
-                **(t.config or {}),
-            }
-            engine_tests.append(EngineTestDef(
+        engine_tests = _deduplicate_test_ids([
+            build_engine_test(
                 name=t.name,
-                test_id=_name_to_id(t.name),
                 type=t.type,
-                profile=t.profile,
                 severity=t.severity,
+                profile=t.profile,
                 enabled=t.enabled,
                 tags=t.tags or [],
-                raw=raw,
-            ))
-        engine_tests = _deduplicate_test_ids(engine_tests)
+                config=t.config or {},
+            )
+            for t in db_test_rows
+        ])
 
         narrowed = DQFConfig(
             engine=engine_cfg,
@@ -193,10 +177,11 @@ def execute_run(
         run_at = datetime.utcnow()
 
         # Tracks which test we're at, for D-15 Type-b mid-run error reporting.
-        state = {"idx": 0}
+        idx = 0
 
         def on_result(result: dict) -> None:
-            state["idx"] += 1
+            nonlocal idx
+            idx += 1
             _persist_result(db, client_id, run_id, result, run_at)
 
         try:
@@ -206,9 +191,9 @@ def execute_run(
             tb = traceback.format_exc(limit=3)
             run.status = "FAILED"
             run.error_reason = _sanitize_error(
-                f"Engine crashed at test {state['idx']} — {type(e).__name__}: {e}"
+                f"Engine crashed at test {idx} — {type(e).__name__}: {e}"
             )
-            run.error_at_test = state["idx"]
+            run.error_at_test = idx
             run.completed_at = datetime.utcnow()
             db.commit()
             print(f"[warn] execute_run run_id={run_id} crashed: {tb}")

@@ -89,6 +89,39 @@ def _deduplicate_test_ids(tests: list[TestDefinition]) -> list[TestDefinition]:
     return result
 
 
+def build_engine_test(
+    *, name: str, type: str, severity: str, profile: str,
+    enabled: bool, tags: list | None, config: dict | None,
+) -> TestDefinition:
+    """Build an engine TestDefinition from normalized fields.
+
+    Single source of truth for the `raw` dict shape the test modules consume,
+    shared by both load paths: the API-JSON loader (load_config_from_api) and
+    the in-process executor (run_executor), which previously hand-built the
+    same dict from differently-shaped inputs and could drift.
+    """
+    tags = tags or []
+    raw = {
+        "name": name,
+        "type": type,
+        "severity": severity,
+        "profile": profile,
+        "enabled": enabled,
+        "tags": tags,
+        **(config or {}),
+    }
+    return TestDefinition(
+        name=name,
+        test_id=_name_to_id(name),
+        type=type,
+        profile=profile,
+        severity=severity,
+        enabled=enabled,
+        tags=tags,
+        raw=raw,
+    )
+
+
 def _load_yaml(path: Path) -> dict:
     with open(path, 'r', encoding='utf-8') as f:
         return yaml.safe_load(f) or {}
@@ -118,30 +151,19 @@ def load_config_from_api(api_url: str, api_key: str, connections: dict) -> DQFCo
         alerts={},
     )
 
-    tests = []
-    for t in raw_list:
-        if not t.get("enabled", True):
-            continue
-        # Reconstruct the 'raw' dict the test modules expect
-        raw = {
-            "name": t["name"],
-            "type": t["type"],
-            "severity": t["severity"],
-            "profile": t["profile"],
-            "enabled": t["enabled"],
-            "tags": t.get("tags", []),
-            **t.get("config", {}),
-        }
-        tests.append(TestDefinition(
+    tests = [
+        build_engine_test(
             name=t["name"],
-            test_id=_name_to_id(t["name"]),
             type=t["type"],
-            profile=t["profile"],
             severity=t["severity"],
+            profile=t["profile"],
             enabled=t["enabled"],
             tags=t.get("tags", []),
-            raw=raw,
-        ))
+            config=t.get("config", {}),
+        )
+        for t in raw_list
+        if t.get("enabled", True)
+    ]
 
     return DQFConfig(engine=engine_cfg, connections=connections, tests=_deduplicate_test_ids(tests))
 

@@ -8,12 +8,9 @@ from dashboard_api import models, schemas
 from dashboard_api.auth import get_client_any_auth, get_current_client_jwt
 from dashboard_api.database import get_db
 from fastapi.responses import PlainTextResponse
-from dashboard_api.yaml_sync import export_tests_to_yaml, generate_yaml_string
+from dashboard_api.yaml_sync import export_tests_to_yaml, generate_yaml_string, _STANDARD_KEYS
 
 router = APIRouter(prefix="/api/v1/tests", tags=["tests"])
-
-# Standard YAML keys (everything else goes into config)
-_STANDARD_KEYS = {"name", "description", "type", "severity", "enabled", "tags", "profile"}
 
 
 @router.get("/yaml", response_class=PlainTextResponse)

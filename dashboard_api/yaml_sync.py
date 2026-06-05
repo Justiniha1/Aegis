@@ -45,14 +45,13 @@ def _db_test_to_yaml_dict(test: models.TestDefinition) -> dict:
     return d
 
 
-def export_tests_to_yaml(db: Session, client_id: int, yaml_path: Path | None = None) -> None:
-    """
-    Regenerate the YAML test definitions file from the database.
-    Preserves existing `engine` and `settings` sections.
-    """
-    path = yaml_path or YAML_PATH
+def _build_output_dict(db: Session, client_id: int, path: Path) -> dict:
+    """Build the YAML output dict for a client: the regenerated `tests` list plus
+    the existing file's `engine`/`settings` sections (preserved verbatim).
 
-    # Read existing YAML to preserve engine/settings
+    Shared by export_tests_to_yaml (writes to disk) and generate_yaml_string
+    (returns a string) so the two cannot drift in what they preserve or emit.
+    """
     existing: dict = {}
     if path.exists():
         try:
@@ -61,7 +60,6 @@ def export_tests_to_yaml(db: Session, client_id: int, yaml_path: Path | None = N
         except Exception:
             existing = {}
 
-    # Query all tests for this client
     tests = (
         db.query(models.TestDefinition)
         .filter(models.TestDefinition.client_id == client_id)
@@ -69,14 +67,22 @@ def export_tests_to_yaml(db: Session, client_id: int, yaml_path: Path | None = N
         .all()
     )
 
-    # Build the output dict, preserving engine/settings
     output: dict = {}
     if "engine" in existing:
         output["engine"] = existing["engine"]
     if "settings" in existing:
         output["settings"] = existing["settings"]
-
     output["tests"] = [_db_test_to_yaml_dict(t) for t in tests]
+    return output
+
+
+def export_tests_to_yaml(db: Session, client_id: int, yaml_path: Path | None = None) -> None:
+    """
+    Regenerate the YAML test definitions file from the database.
+    Preserves existing `engine` and `settings` sections.
+    """
+    path = yaml_path or YAML_PATH
+    output = _build_output_dict(db, client_id, path)
 
     # Write atomically (write to temp, then rename)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -96,30 +102,5 @@ def generate_yaml_string(db: Session, client_id: int) -> str:
     Generate the YAML content as a string (for the frontend YAML editor).
     Same logic as export_tests_to_yaml but returns a string instead of writing to disk.
     """
-    path = YAML_PATH
-
-    # Read existing YAML to preserve engine/settings
-    existing: dict = {}
-    if path.exists():
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                existing = yaml.safe_load(f) or {}
-        except Exception:
-            existing = {}
-
-    tests = (
-        db.query(models.TestDefinition)
-        .filter(models.TestDefinition.client_id == client_id)
-        .order_by(models.TestDefinition.created_at.asc())
-        .all()
-    )
-
-    output: dict = {}
-    if "engine" in existing:
-        output["engine"] = existing["engine"]
-    if "settings" in existing:
-        output["settings"] = existing["settings"]
-
-    output["tests"] = [_db_test_to_yaml_dict(t) for t in tests]
-
+    output = _build_output_dict(db, client_id, YAML_PATH)
     return yaml.dump(output, default_flow_style=False, sort_keys=False, allow_unicode=True)

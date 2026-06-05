@@ -24,6 +24,7 @@ from starlette.concurrency import run_in_threadpool
 from dashboard_api.database import SessionLocal
 from dashboard_api import models
 from dashboard_api.run_executor import execute_run
+from dashboard_api.queries import active_run
 from dashboard_api.schedule_logic import compute_next_run
 
 _scheduler = AsyncIOScheduler(timezone="UTC")
@@ -68,18 +69,9 @@ async def poll_due_schedules() -> None:
                 # Deleted between the scan and now — skip.
                 continue
 
-            # D-09 active-run guard: replicated from runs.py.
-            active = (
-                db.query(models.Run)
-                .filter(
-                    models.Run.client_id == sched.client_id,
-                    models.Run.status.in_(["QUEUED", "RUNNING"]),
-                )
-                .first()
-            )
-
+            # D-09 active-run guard: shared with runs.py via queries.active_run.
             dispatched = False
-            if active is None:
+            if active_run(db, sched.client_id) is None:
                 run = models.Run(
                     client_id=sched.client_id,
                     profile=sched.profile,
