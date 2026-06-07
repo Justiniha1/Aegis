@@ -19,6 +19,7 @@ tests:
 - name: Customer Email Null Check
   description: Every customer has an email address
   type: null_check
+  profile: demo
   severity: HIGH
   table: customers
   column: email
@@ -27,12 +28,14 @@ tests:
   description: customer_id is unique (primary key)
   type: unique_check
   severity: CRITICAL
+  profile: demo
   table: customers
   column: customer_id
 - name: Customer Row Count
   description: Customers table is populated
   type: row_count
   severity: MEDIUM
+  profile: demo
   table: customers
   min_rows: 1
   max_rows: 100000
@@ -41,6 +44,7 @@ tests:
   description: Every order points at a real customer
   type: relationship_check
   severity: CRITICAL
+  profile: demo
   source_table: orders
   source_column: customer_id
   target_table: customers
@@ -50,6 +54,7 @@ tests:
   description: customers table has the expected columns
   type: schema_check
   severity: HIGH
+  profile: demo
   table: customers
   expected_columns:
     customer_id: integer

@@ -135,10 +135,10 @@ Install the Airflow extra:
 pip install "aegis-dq[airflow]"
 ```
 
-Set these variables in your Airflow environment (or `.env`):
+Set this variable in your Airflow environment (or `.env`) — the hosted API URL is baked
+into the SDK, so the key is the only thing you configure:
 
 ```
-AEGIS_API_URL=https://api.aegis-dq.com
 AEGIS_API_KEY=<your-api-key>
 ```
 
@@ -161,8 +161,9 @@ with DAG(
     )
 ```
 
-The operator uses `AEGIS_API_URL` and `AEGIS_API_KEY` from the environment. No DAG code
-change is needed if you rotate the API key — update the Airflow variable or secret.
+The operator reads `AEGIS_API_KEY` from the environment (the API URL is fixed to the hosted
+endpoint). No DAG code change is needed if you rotate the API key — update the Airflow
+variable or secret.
 
 For profiles that cannot be reached from the website lane (SQLite, on-prem, Snowflake
 behind an IP allowlist), this is the recommended scheduling approach.

@@ -52,8 +52,8 @@ def test_config_yaml_cannot_override_api_url(tmp_path, monkeypatch):
     assert cfg["api_url"] == "https://aegis-production-fa56.up.railway.app"
 
 
-def test_aegis_api_url_env_override_for_internal_dev(tmp_path, monkeypatch):
-    """AEGIS_API_URL is the only supported override (internal dev), not config.yaml."""
+def test_aegis_api_url_env_is_ignored(tmp_path, monkeypatch):
+    """AEGIS_API_URL is no longer honored: the hosted URL is fixed; clients cannot repoint it."""
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("AEGIS_API_KEY", "test-key-dev")
     monkeypatch.setenv("AEGIS_API_URL", "http://localhost:8000")
@@ -61,7 +61,7 @@ def test_aegis_api_url_env_override_for_internal_dev(tmp_path, monkeypatch):
 
     from cli.config import load_config
     cfg = load_config()
-    assert cfg["api_url"] == "http://localhost:8000"
+    assert cfg["api_url"] == "https://aegis-production-fa56.up.railway.app"
 
 
 def test_load_config_raises_when_no_api_key(tmp_path, monkeypatch):

@@ -182,14 +182,14 @@ Run these against the live instance:
    profile dropdown will be empty.
 
 5. **Point an Airflow worker at the live API.** The engine runs on the client's own
-   infra (D-04). In the Airflow environment / `.env` used by the `aegis-dq` SDK, set:
+   infra (D-04). In the Airflow environment / `.env` used by the `aegis-dq` SDK, set only:
    ```
-   AEGIS_API_URL=https://<api>.railway.app
    AEGIS_API_KEY=<api_key saved in step 2>
    ```
-   No DAG code change is needed — `aegis_dq/_client.py` reads these at import.
-   (Note: these are the **SDK** variables `AEGIS_API_URL`/`AEGIS_API_KEY` — not the
-   backend engine's `DQF_API_URL`/`DQF_API_KEY`, which are a different integration.)
+   The hosted API URL is baked into the SDK (`aegis_dq/_client.py`) and is not configurable —
+   the client only ever sets the key. No DAG code change is needed.
+   (Note: `AEGIS_API_KEY` is the **SDK** variable — not the backend engine's `DQF_API_KEY`,
+   which is a different integration.)
 
 ---
 

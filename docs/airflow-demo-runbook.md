@@ -48,11 +48,10 @@ The api service redeploys automatically.
 1. Create a demo client account and copy its API key (POST /api/v1/clients; see DEPLOY.md).
    The api_key is shown once - save it.
 2. Push the demo profile and tests to that client. The CLI reads ./aegis/* relative to the
-   working directory, so push from deploy/demo. Set BOTH env vars in the SAME shell so the
-   repo-root .env (which points at localhost) does not override them:
+   working directory, so push from deploy/demo. The CLI always targets the hosted API (the
+   URL is baked in and not configurable), so you only set the key:
      cd deploy/demo
      $env:AEGIS_API_KEY = "<demo client key>"
-     $env:AEGIS_API_URL = "https://aegis-production-fa56.up.railway.app"
      aegis push
      cd ..\..
    This uploads the demo Postgres profile and the 5 guaranteed-green checks.
@@ -102,8 +101,9 @@ free (any normal laptop is fine).
 - Re-trigger the DAG.
 
 ## Troubleshooting
-- aegis push connects to localhost:8000: AEGIS_API_URL was not set in the shell and the
-  repo .env points at localhost. Set $env:AEGIS_API_URL in the same shell before pushing.
+- aegis push appears to do nothing / wrong target: confirm you are in deploy/demo (the CLI
+  reads ./aegis/* relative to the working directory) and that AEGIS_API_KEY is set. The API
+  URL is fixed to the hosted endpoint and cannot be repointed.
 - Airflow UI looks frozen on "Added Permission..." lines: it is not frozen; the webserver
   is still booting. Confirm with: docker ps (status should be Up) and
   curl http://localhost:8080/health (expect HTTP 200). Wait for it to finish.

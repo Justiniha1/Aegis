@@ -10,14 +10,16 @@ def test_base_defaults_to_hosted_url_when_env_unset(monkeypatch):
     assert client._base == DEFAULT_API_URL
 
 
-def test_env_overrides_default(monkeypatch):
+def test_env_is_ignored(monkeypatch):
+    """AEGIS_API_URL is no longer honored — the hosted URL is fixed and not env-configurable."""
     monkeypatch.setenv("AEGIS_API_URL", "http://localhost:8000")
     client = AegisAPIClient(api_key="k")
-    assert client._base == "http://localhost:8000"
+    assert client._base == DEFAULT_API_URL
 
 
-def test_constructor_arg_overrides_env(monkeypatch):
-    monkeypatch.setenv("AEGIS_API_URL", "http://localhost:8000")
+def test_constructor_arg_sets_base(monkeypatch):
+    """The api_url= constructor arg is the only override (internal/testing)."""
+    monkeypatch.setenv("AEGIS_API_URL", "http://localhost:8000")  # ignored
     client = AegisAPIClient(api_url="http://explicit", api_key="k")
     assert client._base == "http://explicit"
 

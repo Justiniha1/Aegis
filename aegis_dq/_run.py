@@ -62,20 +62,18 @@ def run_checks(
 ) -> dict[str, Any]:
     """Trigger a data-quality run and wait for it to complete.
 
-    Credentials are read from environment variables by default:
-      - AEGIS_API_URL  — base URL of the Aegis dashboard API
-      - AEGIS_API_KEY  — API key issued to your client account
-
-    Override credentials by passing ``api_url`` and ``api_key`` directly
-    (useful in tests or when credentials come from Airflow Variables).
+    The API key is read from the AEGIS_API_KEY environment variable by default.
+    The API URL is fixed (the hosted Aegis endpoint, baked into the SDK) and is not
+    configurable. Pass ``api_key`` directly to override the env var (useful in tests or
+    when the key comes from an Airflow Variable); ``api_url`` is an internal/testing override.
 
     Args:
         profile:          Connection profile name to run (default: "default").
         type_filter:      Optional list of test types to run (e.g. ["null_check"]).
                           None means all enabled tests.
         poll_interval:    Seconds between status polls (default: 5).
-        api_url:          Override AEGIS_API_URL env var.
-        api_key:          Override AEGIS_API_KEY env var.
+        api_url:          Internal/testing override for the (fixed) hosted API URL.
+        api_key:          Override the AEGIS_API_KEY env var.
         max_wait_seconds: Optional hard deadline in seconds. Raises AegisDQRunTimeout
                           if the run has not reached a terminal state within this
                           deadline. None (default) polls indefinitely.
