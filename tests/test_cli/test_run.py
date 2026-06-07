@@ -13,7 +13,7 @@ def aegis_project(tmp_path, monkeypatch):
     aegis = tmp_path / "aegis"
     aegis.mkdir()
     (aegis / "config.yaml").write_text("api_url: https://api.aegis-dq.com\ndefault_profile: production\n")
-    (aegis / "test_definitions.yaml").write_text("tests: []\n")
+    (aegis / "test_definitions.yaml").write_text("settings:\n  default_profile: production\ntests: []\n")
     return tmp_path
 
 
@@ -39,6 +39,31 @@ def test_run_exits_1_on_failed(aegis_project):
         mock.get.return_value = {"status": "FAILED", "error_reason": "No tests configured", "completed_tests": 0, "total_tests": 0}
         result = runner.invoke(app, ["run"])
     assert result.exit_code == 1
+
+
+def test_run_uses_default_profile_from_yaml(aegis_project):
+    """With no --profile, run falls back to settings.default_profile in the YAML."""
+    with patch("cli.commands.run_cmd.AegisClient") as MockClient:
+        mock = MockClient.return_value
+        mock.post.return_value = {"run_id": 1, "status": "QUEUED"}
+        mock.get.return_value = {"status": "COMPLETE", "completed_tests": 0, "total_tests": 0}
+        result = runner.invoke(app, ["run", "--no-wait"])
+    assert result.exit_code == 0
+    mock.post.assert_called_once_with("/api/v1/runs", json={"profile": "production"})
+
+
+def test_run_no_profile_and_no_default_errors(tmp_path, monkeypatch):
+    """No --profile and no settings.default_profile → clear error, run not started."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("AEGIS_API_KEY", "test-key")
+    aegis = tmp_path / "aegis"
+    aegis.mkdir()
+    (aegis / "test_definitions.yaml").write_text("tests: []\n")  # no settings.default_profile
+    with patch("cli.commands.run_cmd.AegisClient") as MockClient:
+        result = runner.invoke(app, ["run"])
+        MockClient.return_value.post.assert_not_called()
+    assert result.exit_code == 1
+    assert "default_profile" in result.output
 
 
 def test_status_prints_last_run(aegis_project):

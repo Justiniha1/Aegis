@@ -19,6 +19,9 @@ import {
 import { countByStatus } from "@/lib/format";
 import type { TestResult, RunSummary } from "@/lib/types";
 
+// Run-history list shows this many runs before the "Show more" control.
+const RUNS_PAGE_SIZE = 8;
+
 export default function HistoryPage() {
   const { token, isLoading: authLoading } = useAuth();
   const { theme } = useTheme();
@@ -28,6 +31,7 @@ export default function HistoryPage() {
   const [results, setResults] = useState<TestResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRun, setSelectedRun] = useState<number | null>(null);
+  const [visibleRuns, setVisibleRuns] = useState(RUNS_PAGE_SIZE);
 
   useEffect(() => {
     if (authLoading) return;
@@ -109,7 +113,7 @@ export default function HistoryPage() {
         <div className="grid grid-cols-4 gap-6">
           {/* Runs list */}
           <div className="col-span-1 space-y-2">
-            {runs.map((run) => {
+            {runs.slice(0, visibleRuns).map((run) => {
               const active = selectedRun === run.run_id;
               return (
                 <button
@@ -149,6 +153,44 @@ export default function HistoryPage() {
                 </button>
               );
             })}
+
+            {runs.length > RUNS_PAGE_SIZE && (
+              <div className="space-y-2 pt-1">
+                {visibleRuns < runs.length && (
+                  <button
+                    onClick={() => setVisibleRuns((v) => Math.min(v + RUNS_PAGE_SIZE, runs.length))}
+                    className="w-full text-caption font-medium py-2.5 transition-colors"
+                    style={{
+                      color: BRAND_TEAL,
+                      backgroundColor: "transparent",
+                      border: `1px dashed ${palette.borderSubtle}`,
+                      borderRadius: "8px",
+                      textTransform: "none",
+                      letterSpacing: "0",
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.backgroundColor = dark ? "rgba(29,158,117,0.08)" : "rgba(29,158,117,0.06)")}
+                    onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent")}
+                  >
+                    Show {Math.min(RUNS_PAGE_SIZE, runs.length - visibleRuns)} more
+                  </button>
+                )}
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-caption" style={{ color: palette.textSecondary, textTransform: "none", letterSpacing: "0" }}>
+                    Showing {Math.min(visibleRuns, runs.length)} of {runs.length}
+                  </span>
+                  {visibleRuns > RUNS_PAGE_SIZE && (
+                    <button
+                      onClick={() => setVisibleRuns(RUNS_PAGE_SIZE)}
+                      className="text-caption font-medium transition-opacity hover:opacity-70"
+                      style={{ color: BRAND_TEAL, background: "transparent", border: "none", cursor: "pointer", textTransform: "none", letterSpacing: "0" }}
+                    >
+                      Show less
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Run detail */}

@@ -1,20 +1,48 @@
 import time
+from pathlib import Path
 from typing import Optional
 import typer
+import yaml
 from cli.config import load_config
 from cli.api_client import AegisClient
 
 POLL_INTERVAL = 3  # seconds between status polls
 
 
+def _default_profile_from_yaml() -> Optional[str]:
+    """Read settings.default_profile from the local aegis/test_definitions.yaml, if set."""
+    path = Path("aegis") / "test_definitions.yaml"
+    if not path.exists():
+        return None
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return None
+    default_profile = (data.get("settings") or {}).get("default_profile")
+    return str(default_profile) if default_profile else None
+
+
 def run_cmd(
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Connection profile to run"),
+    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Connection profile to run (defaults to settings.default_profile in aegis/test_definitions.yaml)"),
     suite: Optional[str] = typer.Option(None, "--suite", "-s", help="Named test suite to run"),
     no_wait: bool = typer.Option(False, "--no-wait", help="Trigger run and exit without polling"),
 ):
-    """Trigger a data quality run on the Aegis servers."""
+    """Trigger a data quality run on the Aegis servers.
+
+    With no --profile, falls back to `settings.default_profile` in the local
+    aegis/test_definitions.yaml. If neither is set, the run is not started.
+    """
     cfg = load_config()
-    selected_profile = profile or cfg.get("default_profile", "dev")
+    selected_profile = profile or _default_profile_from_yaml()
+    if not selected_profile:
+        typer.echo(
+            "[aegis] No profile given and no 'default_profile' set under 'settings' in "
+            "aegis/test_definitions.yaml.\n"
+            "        Pass --profile <name>, or add:\n"
+            "          settings:\n"
+            "            default_profile: <name>"
+        )
+        raise typer.Exit(1)
 
     payload = {"profile": selected_profile}
     if suite:
