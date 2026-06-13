@@ -18,10 +18,14 @@ def list_clients(db: Session = Depends(get_db), current=Depends(get_client_any_a
 
 @router.delete("/{client_id}", status_code=204)
 def delete_client(client_id: int, db: Session = Depends(get_db), current=Depends(get_client_any_auth)):
-    """Delete a client and all their test results. Only the client themselves can delete their account."""
+    """Delete a client and all their data. Only the client themselves can delete their account."""
     if current.id != client_id:
         raise HTTPException(status_code=403, detail="You can only delete your own account")
+    # Order matters: TestResult references runs.id, so delete it before Run.
     db.query(models.TestResult).filter(models.TestResult.client_id == client_id).delete()
+    db.query(models.Run).filter(models.Run.client_id == client_id).delete()
+    db.query(models.Schedule).filter(models.Schedule.client_id == client_id).delete()
+    db.query(models.ConnectionConfig).filter(models.ConnectionConfig.client_id == client_id).delete()
     db.query(models.TestDefinition).filter(models.TestDefinition.client_id == client_id).delete()
     db.delete(current)
     db.commit()
