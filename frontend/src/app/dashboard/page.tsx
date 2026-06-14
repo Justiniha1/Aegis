@@ -13,7 +13,7 @@ import {
 } from "recharts";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
-import { apiGet } from "@/lib/api";
+import { apiGet, listRuns } from "@/lib/api";
 import { useRunContext } from "@/lib/run-context";
 import {
   SEVERITY_COLORS,
@@ -32,7 +32,8 @@ import {
 import { countByStatus, latestRunResults } from "@/lib/format";
 import { metricEntriesOf } from "@/lib/error-model";
 import { ErrorDetail } from "@/components/ErrorDetail";
-import type { TestResult, TestDefinition } from "@/lib/types";
+import { RunFailureBanner } from "@/components/RunFailureBanner";
+import type { TestResult, TestDefinition, Run } from "@/lib/types";
 
 /* ── colour helpers ───────────────────────────────────────────────────────── */
 const SEV_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW"] as const;
@@ -115,6 +116,7 @@ export default function DashboardPage() {
   const { lastCompleted } = useRunContext();
   const [results, setResults] = useState<TestResult[]>([]);
   const [testDefs, setTestDefs] = useState<TestDefinition[]>([]);
+  const [latestRun, setLatestRun] = useState<Run | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [drillMode, setDrillMode] = useState<"type" | "table">("type");
@@ -134,8 +136,13 @@ export default function DashboardPage() {
     Promise.all([
       apiGet("/api/v1/results?limit=500", token),
       apiGet("/api/v1/tests", token),
+      listRuns(50, token),
     ])
-      .then(([res, defs]) => { setResults(res); setTestDefs(defs); })
+      .then(([res, defs, runs]: [TestResult[], TestDefinition[], Run[]]) => {
+        setResults(res); setTestDefs(defs);
+        const newest = [...runs].sort((a, b) => b.id - a.id)[0] ?? null;
+        setLatestRun(newest);
+      })
       .catch(() => router.push("/login"))
       .finally(() => setLoading(false));
   }, [token, authLoading, router, lastCompleted]); // lastCompleted triggers re-fetch on run completion
@@ -524,6 +531,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Full results table ─────────────────────────────────────────── */}
+      {latestRun && <RunFailureBanner run={latestRun} />}
       <ResultsTable results={latestResults} summary={summary} queryByTestName={queryByTestName} />
     </div>
   );
