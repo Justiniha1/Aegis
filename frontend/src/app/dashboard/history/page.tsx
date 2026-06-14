@@ -108,7 +108,7 @@ export default function HistoryPage() {
               return (
                 <button
                   key={v.run.id}
-                  onClick={() => setSelectedRun(v.run.id)}
+                  onClick={() => { setSelectedRun(v.run.id); setExpandedRow(null); }}
                   className="w-full text-left p-4 transition-colors"
                   style={{
                     backgroundColor: palette.surfaceElevated,
@@ -233,6 +233,8 @@ export default function HistoryPage() {
                               className="transition-colors cursor-pointer"
                               style={{ height: "40px", borderTop: `1px solid ${palette.borderSubtle}` }}
                               onClick={() => setExpandedRow(isExpanded ? null : r.id)}
+                              onMouseEnter={(e) => ((e.currentTarget as HTMLTableRowElement).style.backgroundColor = dark ? "rgba(232,236,243,0.04)" : "rgba(14,22,38,0.04)")}
+                              onMouseLeave={(e) => ((e.currentTarget as HTMLTableRowElement).style.backgroundColor = "transparent")}
                             >
                               <td className="pl-6 py-3"><StatusDot status={r.status} /></td>
                               <td className="px-2 py-3 text-caption" style={{ color: palette.textSecondary, textTransform: "none", letterSpacing: "0" }}>{isExpanded ? "▼" : "▶"}</td>
@@ -245,6 +247,7 @@ export default function HistoryPage() {
                             {isExpanded && (
                               <tr style={{ borderTop: `1px solid ${palette.borderSubtle}` }}>
                                 <td colSpan={7} className="px-12 py-3" style={{ backgroundColor: palette.surfaceBg }}>
+                                  {/* sqlQuery not passed: TestResult does not carry the query; would require joining TestDefinition */}
                                   <ErrorDetail result={r} />
                                 </td>
                               </tr>
