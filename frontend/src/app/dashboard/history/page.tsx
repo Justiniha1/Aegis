@@ -55,7 +55,7 @@ export default function HistoryPage() {
   if (loading || authLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-body" style={{ color: palette.textSecondary }}>Loading...</p>
+        <p className="text-body" style={{ color: palette.textSecondary }}>Loading…</p>
       </div>
     );
   }
