@@ -102,6 +102,9 @@ export function RunProvider({ children }: { children: React.ReactNode }) {
         if (run.error) {
           setRunError(run.error.reason);
           setRunErrorAtTest(run.error.at_test ?? null);
+        } else {
+          setRunError(null);
+          setRunErrorAtTest(null);
         }
         if (run.status === "COMPLETE" || run.status === "FAILED") {
           clearInterval(interval);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { RunStatus } from "@/lib/types";
 import { NEUTRAL_SCALE, STATUS_PALETTE, RUN_STATUS_PALETTE } from "@/lib/constants";
 
@@ -22,6 +22,10 @@ export function StatusFooter({
   const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
   const [expanded, setExpanded] = useState(false);
 
+  useEffect(() => {
+    if (runStatus !== "FAILED") setExpanded(false);
+  }, [runStatus]);
+
   const state = runStatus ? ENGINE_STATES[runStatus] : null;
   const dotColor = state ? state.color : STATUS_PALETTE.SKIPPED;
   const label    = state ? state.label : "Engine: idle";
@@ -29,9 +33,11 @@ export function StatusFooter({
   const isFailed = runStatus === "FAILED";
 
   return (
-    <div className="relative">
+    <div className="relative z-10">
       {isFailed && expanded && (
         <div
+          role="region"
+          aria-live="polite"
           className="absolute bottom-full left-0 right-0 px-6 py-3"
           style={{ backgroundColor: palette.surfaceElevated, borderTop: `1px solid ${STATUS_PALETTE.FAILED}` }}
         >
@@ -49,6 +55,15 @@ export function StatusFooter({
         className="flex items-center px-6"
         style={{ height: "32px", backgroundColor: palette.surfaceElevated, borderTop: `1px solid ${palette.borderSubtle}`, cursor: isFailed ? "pointer" : "default" }}
         onClick={() => isFailed && setExpanded((e) => !e)}
+        role={isFailed ? "button" : undefined}
+        tabIndex={isFailed ? 0 : undefined}
+        aria-expanded={isFailed ? expanded : undefined}
+        onKeyDown={(e) => {
+          if (isFailed && (e.key === "Enter" || e.key === " ")) {
+            e.preventDefault();
+            setExpanded((v) => !v);
+          }
+        }}
       >
         <span className="flex items-center gap-2 text-[13px]" style={{ color: isFailed ? STATUS_PALETTE.FAILED : palette.textSecondary }}>
           <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "9999px", backgroundColor: dotColor, animation: pulse ? "pulse 1.5s ease-in-out infinite" : "none", transition: "background-color 300ms" }} />
