@@ -30,6 +30,7 @@ import {
   StatusDot,
 } from "@/components/StatusBadge";
 import { countByStatus, latestRunResults } from "@/lib/format";
+import { metricEntriesOf } from "@/lib/error-model";
 import { ErrorDetail } from "@/components/ErrorDetail";
 import type { TestResult, TestDefinition } from "@/lib/types";
 
@@ -806,9 +807,7 @@ function ResultsTable({
           <tbody style={{ borderTop: `1px solid ${palette.borderSubtle}` }}>
             {filtered.map((r) => {
               const isExpanded = expandedRow === r.id;
-              const metricEntries = Object.entries(r.metrics || {}).filter(
-                ([k]) => !["table", "column", "columns", "expected_columns", "query"].includes(k)
-              );
+              const metricEntries = metricEntriesOf(r);
               const isCustomSql = r.test_type === "custom_sql";
               const sqlQuery = isCustomSql ? queryByTestName.get(r.test_name) : undefined;
               const hasExpandContent = metricEntries.length > 0 || (isCustomSql && sqlQuery);
