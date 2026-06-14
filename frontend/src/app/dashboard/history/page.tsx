@@ -43,7 +43,9 @@ export default function HistoryPage() {
     if (authLoading) return;
     if (!token) { router.push("/login"); return; }
     Promise.all([
-      listRuns(1000, token),
+      // The runs list endpoint caps limit at 200 (ge=1, le=200); 1000 would 422 and
+      // trip the catch below into a spurious logout redirect.
+      listRuns(200, token),
       apiGet("/api/v1/results?limit=1000", token),
     ])
       .then(([rs, res]) => { setRuns(rs); setResults(res as TestResult[]); })
