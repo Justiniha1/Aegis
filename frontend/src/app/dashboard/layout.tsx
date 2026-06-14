@@ -1,10 +1,12 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { RunProvider, useRunContext } from "@/lib/run-context";
+import { ToastProvider, useToast } from "@/components/Toast";
 import { TopBar } from "@/components/TopBar";
 import { StatusFooter } from "@/components/StatusFooter";
 import {
@@ -34,7 +36,9 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string }[] }[] 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <RunProvider>
-      <DashboardLayoutInner>{children}</DashboardLayoutInner>
+      <ToastProvider>
+        <DashboardLayoutInner>{children}</DashboardLayoutInner>
+      </ToastProvider>
     </RunProvider>
   );
 }
@@ -44,7 +48,18 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { clientName, logout } = useAuth();
   const { theme, toggle } = useTheme();
-  const { runStatus, runError, isTriggering, trigger, passingCount, warningCount, selectedProfile } = useRunContext();
+  const { runId, runStatus, runError, runErrorAtTest, isTriggering, trigger, passingCount, warningCount, selectedProfile } = useRunContext();
+  const { showToast } = useToast();
+  const lastToasted = useRef<number | null>(null);
+  useEffect(() => {
+    if (runStatus === "FAILED" && runId && lastToasted.current !== runId) {
+      lastToasted.current = runId;
+      showToast({
+        message: `Run #${runId} failed${runError ? ` — ${runError}` : ""}`,
+        href: "/dashboard/history",
+      });
+    }
+  }, [runStatus, runId, runError, showToast]);
 
   const dark = theme === "dark";
   const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
@@ -176,7 +191,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
         <main className="flex-1 overflow-auto p-8" style={{ backgroundColor: palette.surfaceBg }}>
           {children}
         </main>
-        <StatusFooter dark={dark} runStatus={runStatus} />
+        <StatusFooter dark={dark} runStatus={runStatus} runError={runError} runErrorAtTest={runErrorAtTest} />
       </div>
     </div>
   );
