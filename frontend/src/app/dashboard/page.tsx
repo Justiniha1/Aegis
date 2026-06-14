@@ -19,7 +19,6 @@ import {
   SEVERITY_COLORS,
   TYPE_LABELS,
   SEVERITY_LABELS,
-  formatConfigKey,
   BRAND_TEAL,
   STATUS_PALETTE,
   NEUTRAL_SCALE,
@@ -30,7 +29,8 @@ import {
   TypePill,
   StatusDot,
 } from "@/components/StatusBadge";
-import { countByStatus, latestRunResults, formatMetricValue } from "@/lib/format";
+import { countByStatus, latestRunResults } from "@/lib/format";
+import { ErrorDetail } from "@/components/ErrorDetail";
 import type { TestResult, TestDefinition } from "@/lib/types";
 
 /* ── colour helpers ───────────────────────────────────────────────────────── */
@@ -885,61 +885,8 @@ function ResultsTable({
                   </tr>
                   {isExpanded && hasExpandContent && (
                     <tr style={{ borderTop: `1px solid ${palette.borderSubtle}` }}>
-                      <td
-                        colSpan={9}
-                        className="px-12 py-3"
-                        style={{ backgroundColor: palette.surfaceBg }}
-                      >
-                        {isCustomSql && sqlQuery && (
-                          <div
-                            className="mb-3 overflow-hidden"
-                            style={{
-                              backgroundColor: palette.surfaceElevated,
-                              border: `1px solid ${palette.borderSubtle}`,
-                              borderRadius: "8px",
-                            }}
-                          >
-                            <div
-                              className="px-4 py-2 font-mono text-xs"
-                              style={{
-                                borderBottom: `1px solid ${palette.borderSubtle}`,
-                                color: palette.textSecondary,
-                              }}
-                            >
-                              query
-                            </div>
-                            <pre
-                              className="px-4 py-3 font-mono text-xs overflow-x-auto whitespace-pre max-h-64 overflow-y-auto"
-                              style={{ color: palette.textPrimary }}
-                            >
-                              <code>{sqlQuery}</code>
-                            </pre>
-                          </div>
-                        )}
-                        {metricEntries.length > 0 && (
-                          <div className="grid grid-cols-4 gap-3">
-                            {metricEntries.map(([key, val]) => (
-                              <div
-                                key={key}
-                                className="px-3 py-2"
-                                style={{
-                                  backgroundColor: palette.surfaceElevated,
-                                  border: `1px solid ${palette.borderSubtle}`,
-                                  borderRadius: "8px",
-                                }}
-                              >
-                                <p className="text-caption" style={{ color: palette.textSecondary }}>{formatConfigKey(key)}</p>
-                                <p
-                                  className="text-body font-medium mt-0.5 truncate"
-                                  style={{ color: palette.textPrimary }}
-                                  title={typeof val === "object" ? JSON.stringify(val) : String(val)}
-                                >
-                                  {formatMetricValue(val)}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                      <td colSpan={9} className="px-12 py-3" style={{ backgroundColor: palette.surfaceBg }}>
+                        <ErrorDetail result={r} sqlQuery={sqlQuery} />
                       </td>
                     </tr>
                   )}
@@ -958,13 +905,8 @@ function DetailCard({ result: r, sqlQuery }: { result: TestResult; sqlQuery?: st
   const dark = theme === "dark";
   const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
   const [expanded, setExpanded] = useState(false);
-  const metrics = r.metrics || {};
   const table = extractTable(r);
   const columns = extractColumns(r);
-  const metricEntries = Object.entries(metrics).filter(
-    ([k]) => !["table", "column", "columns", "expected_columns", "query"].includes(k)
-  );
-  const isCustomSql = r.test_type === "custom_sql";
 
   return (
     <div
@@ -1006,65 +948,15 @@ function DetailCard({ result: r, sqlQuery }: { result: TestResult; sqlQuery?: st
         )}
       </div>
 
-      {r.message && (
-        <p
-          className={`text-body mt-1.5 ml-6 ${expanded ? "" : "line-clamp-2"}`}
-          style={{ color: palette.textSecondary }}
-          title={r.message}
-        >
+      {r.message && !expanded && (
+        <p className="text-body mt-1.5 ml-6 line-clamp-2" style={{ color: palette.textSecondary }} title={r.message}>
           {r.message}
         </p>
       )}
 
-      {expanded && isCustomSql && sqlQuery && (
-        <div
-          className="mt-3 ml-6 overflow-hidden"
-          style={{
-            backgroundColor: palette.surfaceElevated,
-            border: `1px solid ${palette.borderSubtle}`,
-            borderRadius: "8px",
-          }}
-        >
-          <div
-            className="px-4 py-2 font-mono text-xs"
-            style={{
-              borderBottom: `1px solid ${palette.borderSubtle}`,
-              color: palette.textSecondary,
-            }}
-          >
-            query
-          </div>
-          <pre
-            className="px-4 py-3 font-mono text-xs overflow-x-auto whitespace-pre max-h-64 overflow-y-auto"
-            style={{ color: palette.textPrimary }}
-          >
-            <code>{sqlQuery}</code>
-          </pre>
-        </div>
-      )}
-
-      {expanded && metricEntries.length > 0 && (
-        <div className="mt-3 ml-6 grid grid-cols-3 gap-3">
-          {metricEntries.map(([key, val]) => (
-            <div
-              key={key}
-              className="px-3 py-2"
-              style={{
-                backgroundColor: palette.surfaceElevated,
-                border: `1px solid ${palette.borderSubtle}`,
-                borderRadius: "8px",
-              }}
-            >
-              <p className="text-caption" style={{ color: palette.textSecondary }}>{formatConfigKey(key)}</p>
-              <p
-                className="text-body font-medium mt-0.5 truncate"
-                style={{ color: palette.textPrimary }}
-                title={typeof val === "object" ? JSON.stringify(val) : String(val)}
-              >
-                {formatMetricValue(val)}
-              </p>
-            </div>
-          ))}
+      {expanded && (
+        <div className="mt-3 ml-6">
+          <ErrorDetail result={r} sqlQuery={sqlQuery} />
         </div>
       )}
     </div>
