@@ -27,15 +27,6 @@ export interface TestDefinition {
   updated_at: string;
 }
 
-export interface RunSummary {
-  run_id: number;
-  run_at: string;
-  total: number;
-  passed: number;
-  failed: number;
-  errors: number;
-}
-
 /* ── Phase 2 — Run lifecycle types ──────────────────────────────────── */
 
 export type RunStatus = "QUEUED" | "RUNNING" | "COMPLETE" | "FAILED";

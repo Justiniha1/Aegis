@@ -34,7 +34,7 @@ export function RunFailureBanner({ run }: { run: Run }) {
       </p>
       <p className="text-caption mt-1" style={{ color: palette.textSecondary, textTransform: "none", letterSpacing: "0" }}>
         profile: {run.profile} · ran {run.completed_tests} of {run.total_tests} test
-        {run.total_tests !== 1 ? "s" : ""}
+        {run.total_tests !== 1 ? "s" : ""} before failing
       </p>
       {reason && (
         <p

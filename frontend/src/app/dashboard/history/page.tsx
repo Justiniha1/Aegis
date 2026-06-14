@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
+import { useRunContext } from "@/lib/run-context";
 import { apiGet, listRuns } from "@/lib/api";
 import { buildRunViews, type RunView } from "@/lib/run-views";
 import { RunFailureBanner } from "@/components/RunFailureBanner";
@@ -27,6 +28,7 @@ const RUNS_PAGE_SIZE = 8;
 export default function HistoryPage() {
   const { token, isLoading: authLoading } = useAuth();
   const { theme } = useTheme();
+  const { lastCompleted } = useRunContext();
   const dark = theme === "dark";
   const palette = dark ? NEUTRAL_SCALE.dark : NEUTRAL_SCALE.light;
   const router = useRouter();
@@ -47,7 +49,7 @@ export default function HistoryPage() {
       .then(([rs, res]) => { setRuns(rs); setResults(res as TestResult[]); })
       .catch(() => router.push("/login"))
       .finally(() => setLoading(false));
-  }, [token, authLoading, router]);
+  }, [token, authLoading, router, lastCompleted]);
 
   const views: RunView[] = useMemo(() => buildRunViews(runs, results), [runs, results]);
   const selectedView = selectedRun != null ? views.find((v) => v.run.id === selectedRun) ?? null : null;

@@ -58,6 +58,7 @@ export function ErrorDetail({ result, sqlQuery }: { result: TestResult; sqlQuery
       )}
 
       {metricEntries.length > 0 && (
+        // 3-column metric grid: standardized across Dashboard + History (was 4-col in the old ResultsTable expand).
         <div className="grid grid-cols-3 gap-3">
           {metricEntries.map(([key, val]) => (
             <div key={key} className="px-3 py-2" style={cardStyle}>
