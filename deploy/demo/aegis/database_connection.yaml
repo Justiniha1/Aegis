@@ -1,8 +1,4 @@
-# deploy/demo/aegis/database_connection.yaml
-# Demo profile for the Aegis Airflow sales demo.
-# Pushed to the demo client account via `aegis push` (see docs/airflow-demo-runbook.md).
-# The ${DEMO_DB_*} vars are resolved server-side on the api service at run time.
-
+n
 demo:
   type: postgres
   host: ${DEMO_DB_HOST}

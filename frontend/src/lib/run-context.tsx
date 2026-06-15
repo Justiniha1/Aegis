@@ -16,6 +16,7 @@ type RunCtx = {
   runId: number | null;
   runStatus: RunStatus | null;
   runError: string | null;
+  runErrorAtTest: number | null;
   isTriggering: boolean;
   trigger: () => Promise<void>;
   lastCompleted: number;
@@ -36,6 +37,7 @@ export function RunProvider({ children }: { children: React.ReactNode }) {
   const [runId, setRunId] = useState<number | null>(null);
   const [runStatus, setRunStatus] = useState<RunStatus | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
+  const [runErrorAtTest, setRunErrorAtTest] = useState<number | null>(null);
   const [isTriggering, setIsTriggering] = useState(false);
   const [lastCompleted, setLastCompleted] = useState(0);
   const [passingCount, setPassingCount] = useState(0);
@@ -97,7 +99,13 @@ export function RunProvider({ children }: { children: React.ReactNode }) {
       try {
         const run = await getRun(runId, token);
         setRunStatus(run.status);
-        if (run.error) setRunError(run.error.reason);
+        if (run.error) {
+          setRunError(run.error.reason);
+          setRunErrorAtTest(run.error.at_test ?? null);
+        } else {
+          setRunError(null);
+          setRunErrorAtTest(null);
+        }
         if (run.status === "COMPLETE" || run.status === "FAILED") {
           clearInterval(interval);
           setLastCompleted((n) => n + 1);
@@ -115,6 +123,7 @@ export function RunProvider({ children }: { children: React.ReactNode }) {
     isTriggeringRef.current = true;
     setIsTriggering(true);
     setRunError(null);
+    setRunErrorAtTest(null);
     setRunStatus(null);
     try {
       const res = await apiTriggerRun(selectedProfile, null, token);
@@ -132,7 +141,7 @@ export function RunProvider({ children }: { children: React.ReactNode }) {
     <RunContext.Provider
       value={{ profiles, selectedProfile, setSelectedProfile, refreshProfiles: loadProfiles,
                profilesLoading, profilesError,
-               runId, runStatus, runError, isTriggering, trigger, lastCompleted, passingCount, warningCount }}
+               runId, runStatus, runError, runErrorAtTest, isTriggering, trigger, lastCompleted, passingCount, warningCount }}
     >
       {children}
     </RunContext.Provider>

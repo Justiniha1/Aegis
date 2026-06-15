@@ -1,6 +1,4 @@
-# deploy/demo/aegis/test_definitions.yaml
-# Minimal, guaranteed-green test set for the Airflow demo.
-# Every check passes against deploy/demo/db/seed_demo.sql.
+
 engine: Simple
 settings:
   default_profile: demo
@@ -16,14 +14,6 @@ settings:
       recipients: []
       notify_on: []
 tests:
-- name: Customer Email Null Check
-  description: Every customer has an email address
-  type: null_check
-  profile: demo
-  severity: HIGH
-  table: customers
-  column: email
-  threshold: 0
 - name: Customer ID Uniqueness
   description: customer_id is unique (primary key)
   type: unique_check
@@ -63,3 +53,31 @@ tests:
     email: string
     signup_date: date
     country: string
+- name: Customer Email Null Check
+  description: Every customer has an email address
+  type: null_check
+  severity: HIGH
+  profile: demo
+  table: customers
+  column: email
+  threshold: 0
+- name: Order Total Within Expected Range
+  description: Order totals should stay at or below $300 — flags unusually large
+    orders for review
+  type: range_check
+  severity: HIGH
+  profile: demo
+  table: orders
+  column: order_total
+  max_value: 300
+  max_outliers: 0
+- name: Daily Order Volume Floor
+  description: Expect at least 60 orders for the period — alerts when volume 
+    drops
+  type: row_count
+  severity: MEDIUM
+  profile: demo
+  table: orders
+  min_rows: 60
+  max_rows: 100000
+  timeframe: all_time
