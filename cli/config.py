@@ -1,6 +1,6 @@
 import os
 import sys
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
 from aegis_dq._client import DEFAULT_API_URL
 
@@ -15,7 +15,12 @@ def load_config() -> dict:
     The only client-settable value is AEGIS_API_KEY (via env or a .env file). The API URL is
     always the hosted default; the default profile is "dev" unless a command passes --profile.
     """
-    load_dotenv()
+    # Resolve .env from the user's current directory (walking up), NOT from this
+    # module's install location. Without usecwd=True, python-dotenv searches up from
+    # cli/config.py — which lands in site-packages for a real `pip install` and never
+    # finds the client's project .env. usecwd=True makes the .env live where the user
+    # actually runs aegis (next to their aegis/ config), matching the YAML resolution.
+    load_dotenv(find_dotenv(usecwd=True))
 
     api_key = os.environ.get("AEGIS_API_KEY")
     if not api_key:

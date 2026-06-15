@@ -56,6 +56,18 @@ The client-lane is nearly done; the **hosted website-lane is where the real engi
 hosted-lane infra work — that is the long pole. Worth re-confirming the investment is wanted
 there vs. leaning client-lane-first and treating hosted as best-effort.
 
+## Known bugs (discovered during demo prep, 2026-06-07)
+
+- **The quality gate does not block on failing checks.** `run_executor` marks a run `COMPLETE`
+  whenever the engine finishes without crashing — it does not flip to `FAILED` when individual
+  checks fail. `run_checks` only raises `AegisDQChecksFailed` on run status `FAILED`
+  (`aegis_dq/_run.py:103`). Net effect: failing checks show red in the dashboard, but the
+  `AegisDQOperator` task stays GREEN and downstream is NOT blocked — contradicting the
+  operator docstring and example DAG ("fails the task and blocks downstream when any check
+  fails"). Fix: expose a failed-test count on the run (RunOut, computed — no migration) and
+  have `run_checks` raise when it's > 0. This also feeds the "per-test pass/fail in `aegis run`"
+  item. HIGH priority — it's the core product promise.
+
 ## Independent of Snowflake
 
 - Two open v1.3 UAT gates still want closing: Settings scheduling browser flow, and a live

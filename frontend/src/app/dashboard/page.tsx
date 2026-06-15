@@ -30,6 +30,7 @@ import {
   StatusDot,
 } from "@/components/StatusBadge";
 import { countByStatus, latestRunResults } from "@/lib/format";
+import { formatRunTimeFull } from "@/lib/time";
 import { metricEntriesOf } from "@/lib/error-model";
 import { ErrorDetail } from "@/components/ErrorDetail";
 import { RunFailureBanner } from "@/components/RunFailureBanner";
@@ -740,7 +741,7 @@ function ResultsTable({
     return results;
   }, [results, filter]);
 
-  const runTime = results.length > 0 ? new Date(results[0].run_at).toLocaleString() : null;
+  const runTime = results.length > 0 ? formatRunTimeFull(results[0].run_at) : null;
 
   return (
     <div

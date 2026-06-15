@@ -35,8 +35,8 @@ export function ErrorDetail({ result, sqlQuery }: { result: TestResult; sqlQuery
 
       {kind === "execution" && (
         <p className="text-caption" style={{ color: palette.textSecondary, textTransform: "none", letterSpacing: "0" }}>
-          The test itself could not run — this is a configuration or connection problem, not a data
-          failure. Fix the test setup and re-run.
+          The test itself could not run. This is a configuration or connection problem, not a data
+          failure; fix the test setup and re-run.
         </p>
       )}
 

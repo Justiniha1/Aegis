@@ -7,7 +7,7 @@ def test_config_yaml_is_fully_ignored(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("AEGIS_API_KEY", "test-key-from-env")
     monkeypatch.delenv("AEGIS_API_URL", raising=False)
-    monkeypatch.setattr("cli.config.load_dotenv", lambda: None)
+    monkeypatch.setattr("cli.config.load_dotenv", lambda *a, **k: None)
 
     aegis_dir = tmp_path / "aegis"
     aegis_dir.mkdir()
@@ -27,7 +27,7 @@ def test_load_config_without_file_uses_defaults(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("AEGIS_API_KEY", "test-key-defaults")
     monkeypatch.delenv("AEGIS_API_URL", raising=False)
-    monkeypatch.setattr("cli.config.load_dotenv", lambda: None)
+    monkeypatch.setattr("cli.config.load_dotenv", lambda *a, **k: None)
 
     from cli.config import load_config
     cfg = load_config()
@@ -41,7 +41,7 @@ def test_config_yaml_cannot_override_api_url(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("AEGIS_API_KEY", "test-key-override")
     monkeypatch.delenv("AEGIS_API_URL", raising=False)
-    monkeypatch.setattr("cli.config.load_dotenv", lambda: None)
+    monkeypatch.setattr("cli.config.load_dotenv", lambda *a, **k: None)
 
     aegis_dir = tmp_path / "aegis"
     aegis_dir.mkdir()
@@ -57,7 +57,7 @@ def test_aegis_api_url_env_is_ignored(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("AEGIS_API_KEY", "test-key-dev")
     monkeypatch.setenv("AEGIS_API_URL", "http://localhost:8000")
-    monkeypatch.setattr("cli.config.load_dotenv", lambda: None)
+    monkeypatch.setattr("cli.config.load_dotenv", lambda *a, **k: None)
 
     from cli.config import load_config
     cfg = load_config()
@@ -67,7 +67,8 @@ def test_aegis_api_url_env_is_ignored(tmp_path, monkeypatch):
 def test_load_config_raises_when_no_api_key(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("AEGIS_API_KEY", raising=False)
-    monkeypatch.setattr("cli.config.load_dotenv", lambda: None)  # prevent project .env from re-setting the key
+    monkeypatch.setattr("cli.config.load_dotenv", lambda *a, **k: None)  # prevent project .env from re-setting the key
+    monkeypatch.setattr("cli.config.find_dotenv", lambda *a, **k: "")  # don't let a real .env up the tree leak in
 
     aegis_dir = tmp_path / "aegis"
     aegis_dir.mkdir()
