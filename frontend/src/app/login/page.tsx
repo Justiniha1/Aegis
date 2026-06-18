@@ -56,7 +56,7 @@ export default function LoginPage() {
             padding: "32px",
           }}
         >
-          {/* Brand: 32px teal monogram + Aegis wordmark */}
+          {/* Brand: 32px teal monogram + Comet-dq wordmark (login uses the full name) */}
           <div className="flex items-center gap-3 mb-6">
             <div
               className="flex items-center justify-center"
@@ -71,9 +71,9 @@ export default function LoginPage() {
                 color: "#FFFFFF",
                 lineHeight: 1,
               }}
-              aria-label="Aegis"
+              aria-label="Comet-dq"
             >
-              Ae
+              Co
             </div>
             <h1
               className="text-display"
@@ -82,7 +82,7 @@ export default function LoginPage() {
                 letterSpacing: "-0.01em",
               }}
             >
-              Aegis
+              Comet-dq
             </h1>
           </div>
 

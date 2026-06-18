@@ -60,8 +60,14 @@ class ClientOut(BaseModel):
     email: Optional[str] = None
     created_at: datetime
     api_key: Optional[str] = None  # Only populated on creation; never stored plain
+    alert_webhook_url: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+class ClientUpdate(BaseModel):
+    # Self-service settings a client may change. Use "" to clear the webhook.
+    alert_webhook_url: Optional[str] = None
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────

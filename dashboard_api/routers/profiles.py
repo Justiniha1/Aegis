@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from dashboard_api import models, schemas, connection_source
@@ -40,7 +40,15 @@ def sync_profiles(
     db: Session = Depends(get_db),
     client: models.Client = Depends(get_client_any_auth),
 ):
-    """Upload the local database_connection.yaml. Stored per client; preferred over the on-disk file."""
+    """Upload the local database_connection.yaml. Stored per client; preferred over the on-disk file.
+
+    Rejects YAML that embeds literal secrets (H3): credentials must be ${ENV} references
+    so plaintext passwords are never persisted server-side.
+    """
+    reason = connection_source.find_literal_secret(body.yaml_content)
+    if reason:
+        raise HTTPException(status_code=422, detail=reason)
+
     row = (
         db.query(models.ConnectionConfig)
         .filter(models.ConnectionConfig.client_id == client.id)

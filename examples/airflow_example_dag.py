@@ -1,24 +1,24 @@
 """
-Aegis DQ — Example Airflow DAG
+Comet DQ — Example Airflow DAG
 ================================
 
 Drop this file into your Airflow DAGs folder.
 Set one environment variable (or Airflow Variable) on your worker:
 
-    AEGIS_API_KEY   Your Aegis client API key (from Settings -> API Keys)
+    COMET_API_KEY   Your Comet client API key (from Settings -> API Keys)
 
-The Aegis API URL is fixed (the hosted endpoint, baked into the SDK) — you do not configure
+The Comet API URL is fixed (the hosted endpoint, baked into the SDK) — you do not configure
 it. No other configuration is required on the worker. The DAG will:
   1. Trigger a data-quality run against the "production" connection profile
   2. Wait for all checks to complete (polling every 5 seconds)
   3. Fail this task -- and block downstream tasks -- if any check fails
   4. Pass and continue downstream if all checks pass
 
-To change which profile runs, update the `profile` argument on AegisDQOperator.
+To change which profile runs, update the `profile` argument on CometDQOperator.
 To restrict to specific test types, add `type_filter=["null_check", "schema_check"]`.
 
 Install:
-    pip install 'aegis-dq[airflow]'
+    pip install 'comet-dq[airflow]'
 """
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
-from aegis_dq.airflow import AegisDQOperator
+from comet_dq.airflow import CometDQOperator
 
 # ---------------------------------------------------------------------------
 # Default task arguments applied to every task in this DAG.
@@ -45,28 +45,28 @@ default_args = {
 # DAG definition
 # ---------------------------------------------------------------------------
 with DAG(
-    dag_id="aegis_dq_example",
-    description="Run Aegis data-quality checks before downstream processing",
+    dag_id="comet_dq_example",
+    description="Run Comet data-quality checks before downstream processing",
     schedule="@daily",
     start_date=datetime(2024, 1, 1),
     catchup=False,
     default_args=default_args,
-    tags=["aegis", "data-quality"],
+    tags=["comet", "data-quality"],
 ) as dag:
 
     # -----------------------------------------------------------------------
     # Task: run_quality_checks
     #
-    # Triggers an Aegis run for the "production" profile.
-    # The API key is read from the AEGIS_API_KEY env var (the API URL is fixed).
+    # Triggers an Comet run for the "production" profile.
+    # The API key is read from the COMET_API_KEY env var (the API URL is fixed).
     # The task FAILS (and blocks downstream) if any check fails.
     # -----------------------------------------------------------------------
-    run_quality_checks = AegisDQOperator(
+    run_quality_checks = CometDQOperator(
         task_id="run_quality_checks",
         profile="production",         # change to match your connection profile name
         poll_interval=5,              # seconds between status polls
         # To read the key from an Airflow Variable instead of the env var, uncomment:
-        # airflow_var_api_key="AEGIS_API_KEY",
+        # airflow_var_api_key="COMET_API_KEY",
     )
 
     # -----------------------------------------------------------------------

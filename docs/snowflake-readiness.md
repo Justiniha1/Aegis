@@ -1,6 +1,6 @@
 # Snowflake Client Readiness — "Finished State" Breakdown
 
-Reference for what remains to make Aegis genuinely usable by clients on Snowflake.
+Reference for what remains to make Comet genuinely usable by clients on Snowflake.
 Captured 2026-06-07. Decision on record: **support both lanes (hosted website-lane and
 client-lane/Airflow) equally**. Not yet formalized into a milestone.
 
@@ -10,8 +10,8 @@ Working:
 - Connection builder (`backend/core/database_connector.py`): `snowflake://user:pass@account/db?warehouse=…&role=…`,
   account-locator normalization (strips `.snowflakecomputing.com`), `${ENV}` password
   references with loud-fail when unset.
-- Hosted engine image includes `snowflake-sqlalchemy`; `aegis init` ships a Snowflake
-  template; `pip install "aegis-dq[snowflake]"` extra exists.
+- Hosted engine image includes `snowflake-sqlalchemy`; `comet init` ships a Snowflake
+  template; `pip install "comet-dq[snowflake]"` extra exists.
 - Two lanes documented in `docs/client-lane.md`: website-lane (hosted scheduler runs
   Snowflake if no IP allowlist) and client-lane (client's Airflow runs it, posts results).
 
@@ -28,8 +28,8 @@ The plumbing exists. The gaps below are what "finished" requires.
 - **Failure notifications** (email/Slack). Table stakes for a data-quality product; deferred.
 - **CI** (pytest on push) and **Alembic migrations**. Reliability floor before scaling client
   count. Today: manual UAT only, and `create_all` makes column changes on existing tables unsafe.
-- **Polish:** per-test pass/fail in `aegis run`; fix the broken `--no-wait` dashboard link.
-  (Done 2026-06-07: `AEGIS_API_URL` env var removed — the hosted URL is now baked-in and not
+- **Polish:** per-test pass/fail in `comet run`; fix the broken `--no-wait` dashboard link.
+  (Done 2026-06-07: `COMET_API_URL` env var removed — the hosted URL is now baked-in and not
   client-configurable in the CLI or SDK.)
 
 ## Hosted website-lane (the heavy lift "both lanes" commits to)
@@ -41,7 +41,7 @@ The plumbing exists. The gaps below are what "finished" requires.
   credentials and it does not scale. Needs a real per-client secret store.
 - **Static-egress solution** (proxy/NAT). Railway egress IPs are dynamic and cannot be added to
   a Snowflake network policy, so IP-allowlisted Snowflake accounts are unreachable from hosted.
-- **Multi-replica story.** Scheduler is single-replica-gated today (`AEGIS_SCHEDULER_ENABLED`).
+- **Multi-replica story.** Scheduler is single-replica-gated today (`COMET_SCHEDULER_ENABLED`).
 
 ## Client-lane (Airflow)
 
@@ -60,12 +60,12 @@ there vs. leaning client-lane-first and treating hosted as best-effort.
 
 - **The quality gate does not block on failing checks.** `run_executor` marks a run `COMPLETE`
   whenever the engine finishes without crashing — it does not flip to `FAILED` when individual
-  checks fail. `run_checks` only raises `AegisDQChecksFailed` on run status `FAILED`
-  (`aegis_dq/_run.py:103`). Net effect: failing checks show red in the dashboard, but the
-  `AegisDQOperator` task stays GREEN and downstream is NOT blocked — contradicting the
+  checks fail. `run_checks` only raises `CometDQChecksFailed` on run status `FAILED`
+  (`comet_dq/_run.py:103`). Net effect: failing checks show red in the dashboard, but the
+  `CometDQOperator` task stays GREEN and downstream is NOT blocked — contradicting the
   operator docstring and example DAG ("fails the task and blocks downstream when any check
   fails"). Fix: expose a failed-test count on the run (RunOut, computed — no migration) and
-  have `run_checks` raise when it's > 0. This also feeds the "per-test pass/fail in `aegis run`"
+  have `run_checks` raise when it's > 0. This also feeds the "per-test pass/fail in `comet run`"
   item. HIGH priority — it's the core product promise.
 
 ## Independent of Snowflake

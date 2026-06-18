@@ -7,14 +7,12 @@ from sqlalchemy.orm import Session
 from dashboard_api import models, schemas
 from dashboard_api.auth import get_client_any_auth, get_current_client
 from dashboard_api.database import get_db
+from dashboard_api.constants import TEST_TYPES
 
 router = APIRouter(prefix="/api/v1/results", tags=["results"])
 
 _ALLOWED_STATUSES = frozenset({"PASSED", "FAILED", "ERROR", "SKIPPED"})
-_ALLOWED_TYPES = frozenset({
-    "null_check", "duplicate_check", "unique_check", "row_count",
-    "schema_check", "range_check", "relationship_check", "custom_sql",
-})
+_ALLOWED_TYPES = TEST_TYPES
 
 
 @router.post("", status_code=201)
@@ -71,7 +69,12 @@ def submit_results(
         db.add(record)
 
     if batch.run_id is not None:
-        run.completed_tests = run.completed_tests + len(batch.results)
+        # Atomic increment at the DB level — a read-modify-write on the ORM object would
+        # lose increments when concurrent result batches post to the same run.
+        db.query(models.Run).filter(models.Run.id == run.id).update(
+            {models.Run.completed_tests: models.Run.completed_tests + len(batch.results)},
+            synchronize_session=False,
+        )
 
     db.commit()
     return {"stored": len(batch.results), "run_at": run_at.isoformat(), "run_id": run.id}

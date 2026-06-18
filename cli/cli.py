@@ -1,8 +1,8 @@
 import typer
 
 app = typer.Typer(
-    name="aegis",
-    help="Aegis DQ — data quality from the command line.",
+    name="comet",
+    help="Comet DQ — data quality from the command line.",
     no_args_is_help=True,
 )
 

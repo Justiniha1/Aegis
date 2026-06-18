@@ -1,4 +1,7 @@
 from backend.core.database_connector import DatabaseConnector
+from backend.tests.builtin._common import InvalidIdentifier, error, result, safe_identifier, to_int
+
+TYPE = "null_check"
 
 
 def run(connector: DatabaseConnector, test: dict) -> dict:
@@ -6,9 +9,15 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
     column = test.get("column", "").strip()
 
     if not table:
-        return _error(test, "Missing required field: table")
+        return error(test, TYPE, "Missing required field: table")
     if not column:
-        return _error(test, "Missing required field: column")
+        return error(test, TYPE, "Missing required field: column")
+
+    try:
+        table = safe_identifier(table)
+        column = safe_identifier(column)
+    except InvalidIdentifier as e:
+        return error(test, TYPE, str(e))
 
     threshold = test.get("threshold", 0.0)
 
@@ -17,50 +26,31 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
         f"SUM(CASE WHEN {column} IS NULL THEN 1 ELSE 0 END) AS null_count "
         f"FROM {table}"
     )
-    total = int(df["total"].iloc[0])
+    total = to_int(df, "total")
 
     if total == 0:
-        return {
-            "test_id": test["_test_id"],
-            "name": test["name"],
-            "type": "null_check",
-            "status": "SKIPPED",
-            "severity": test.get("severity", "MEDIUM"),
-            "metrics": {"total_rows": 0},
-            "message": f"Table '{table}' is empty — null check skipped",
-        }
+        return result(
+            test, TYPE, "SKIPPED",
+            {"total_rows": 0},
+            f"Table '{table}' is empty — null check skipped",
+        )
 
-    null_count = int(df["null_count"].iloc[0])
+    null_count = to_int(df, "null_count")
     null_pct = null_count / total
     passed = null_pct <= threshold
-    return {
-        "test_id": test["_test_id"],
-        "name": test["name"],
-        "type": "null_check",
-        "status": "PASSED" if passed else "FAILED",
-        "severity": test.get("severity", "MEDIUM"),
-        "metrics": {
+    return result(
+        test, TYPE,
+        "PASSED" if passed else "FAILED",
+        {
             "total_rows": total,
             "null_count": null_count,
             "null_percentage": round(null_pct, 4),
             "threshold": threshold,
         },
-        "message": (
+        (
             f"Null percentage ({null_pct:.2%}) is within threshold ({threshold:.2%})"
             if passed else
             f"Null percentage ({null_pct:.2%}) exceeds threshold ({threshold:.2%}) "
             f"— {null_count} null(s) in {table}.{column}"
         ),
-    }
-
-
-def _error(test: dict, msg: str) -> dict:
-    return {
-        "test_id": test["_test_id"],
-        "name": test["name"],
-        "type": "null_check",
-        "status": "ERROR",
-        "severity": test.get("severity", "MEDIUM"),
-        "metrics": {},
-        "message": msg,
-    }
+    )

@@ -82,6 +82,27 @@ def execute_run(
     client_id: int,
     profile: str,
     type_filter: Optional[list[str]],
+    alert: bool = False,
+) -> None:
+    """Run the engine for a single run record, then optionally fire a failure alert.
+
+    `alert=True` (set by the scheduler) delivers a webhook/email alert to the client if
+    the terminal run warrants one — used for scheduled runs the operator is not watching.
+    Manual UI-triggered runs leave it False. Alerting never affects run execution.
+    """
+    try:
+        _execute_run(run_id, client_id, profile, type_filter)
+    finally:
+        if alert:
+            from dashboard_api.alerts import maybe_send_run_alert
+            maybe_send_run_alert(run_id, client_id)
+
+
+def _execute_run(
+    run_id: int,
+    client_id: int,
+    profile: str,
+    type_filter: Optional[list[str]],
 ) -> None:
     """Run the engine for a single run record. Updates status QUEUED->RUNNING->COMPLETE|FAILED.
 

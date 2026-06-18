@@ -1,6 +1,6 @@
 import typer
 from cli.config import load_config
-from cli.api_client import AegisClient
+from cli.api_client import CometClient
 
 
 def status_cmd(
@@ -8,16 +8,16 @@ def status_cmd(
 ):
     """Print recent run history."""
     cfg = load_config()
-    client = AegisClient(api_url=cfg["api_url"], api_key=cfg["api_key"])
+    client = CometClient(api_url=cfg["api_url"], api_key=cfg["api_key"])
 
     try:
         runs = client.get(f"/api/v1/runs?limit={limit}")
     except Exception as e:
-        typer.echo(f"[aegis] Could not fetch run history: {e}")
+        typer.echo(f"[comet] Could not fetch run history: {e}")
         raise typer.Exit(1)
 
     if not runs:
-        typer.echo("[aegis] No runs yet. Try 'aegis run' to trigger your first run.")
+        typer.echo("[comet] No runs yet. Try 'comet run' to trigger your first run.")
         return
 
     typer.echo(f"{'ID':>5}  {'STATUS':<10}  {'PROFILE':<15}  {'TESTS':>8}  {'STARTED'}")

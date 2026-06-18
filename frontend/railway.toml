@@ -1,4 +1,4 @@
-# Railway config for the Aegis frontend (Next.js) service.
+# Railway config for the Comet frontend (Next.js) service.
 # NEXT_PUBLIC_API_URL is supplied as a Railway variable at build time
 # (see DEPLOY.md two-step procedure); the Dockerfile already declares the ARG.
 [build]

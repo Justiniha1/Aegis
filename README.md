@@ -1,4 +1,4 @@
-# Aegis — Data Quality Framework
+# Comet — Data Quality Framework
 
 A data quality testing framework that runs checks against your databases and displays results on a live dashboard.
 
@@ -74,15 +74,15 @@ Results appear on the dashboard at http://localhost:3000.
 
 If your database is not reachable from the hosted runner (local SQLite, on-prem, or
 Snowflake behind an IP allowlist), run the engine from your own environment. You only
-need `AEGIS_API_KEY` — no `aegis/config.yaml` is required. See
+need `COMET_API_KEY` — no `comet/config.yaml` is required. See
 [docs/client-lane.md](docs/client-lane.md) for the full client-lane runbook, including
-self-run setup and AegisDQOperator scheduling.
+self-run setup and CometDQOperator scheduling.
 
 ---
 
 ## Deploy to Railway
 
-To host Aegis on Railway (managed Postgres + `api` + `frontend`, with the `engine` idle), follow the step-by-step runbook in [DEPLOY.md](DEPLOY.md). It covers provisioning the database, setting the required environment variables, creating your first account, and pointing an Airflow worker at the live API.
+To host Comet on Railway (managed Postgres + `api` + `frontend`, with the `engine` idle), follow the step-by-step runbook in [DEPLOY.md](DEPLOY.md). It covers provisioning the database, setting the required environment variables, creating your first account, and pointing an Airflow worker at the live API.
 
 ---
 

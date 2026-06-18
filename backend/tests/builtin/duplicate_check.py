@@ -1,16 +1,25 @@
 from backend.core.database_connector import DatabaseConnector
+from backend.tests.builtin._common import InvalidIdentifier, error, result, safe_identifier, to_int
+
+TYPE = "duplicate_check"
 
 
 def run(connector: DatabaseConnector, test: dict) -> dict:
     table = test.get("table", "").strip()
     if not table:
-        return _error(test, "Missing required field: table")
+        return error(test, TYPE, "Missing required field: table")
 
     # Support both 'column' (singular) and 'columns' (list)
     raw_cols = test.get("columns") or [test.get("column")]
     columns = [c for c in raw_cols if c]
     if not columns:
-        return _error(test, "At least one column must be specified for duplicate_check")
+        return error(test, TYPE, "At least one column must be specified for duplicate_check")
+
+    try:
+        table = safe_identifier(table)
+        columns = [safe_identifier(c) for c in columns]
+    except InvalidIdentifier as e:
+        return error(test, TYPE, str(e))
 
     max_allowed = test.get("max_allowed", 0)
 
@@ -22,40 +31,25 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
         f"  GROUP BY {cols_sql} HAVING COUNT(*) > 1"
         f") sub"
     )
-    dup_groups = int(df_dups["dup_groups"].iloc[0])
+    dup_groups = to_int(df_dups, "dup_groups")
 
     df_total = connector.execute_query(f"SELECT COUNT(*) AS total FROM {table}")
-    total = int(df_total["total"].iloc[0])
+    total = to_int(df_total, "total")
 
     passed = dup_groups <= max_allowed
-    return {
-        "test_id": test["_test_id"],
-        "name": test["name"],
-        "type": "duplicate_check",
-        "status": "PASSED" if passed else "FAILED",
-        "severity": test.get("severity", "MEDIUM"),
-        "metrics": {
+    return result(
+        test, TYPE,
+        "PASSED" if passed else "FAILED",
+        {
             "total_rows": total,
             "duplicate_groups": dup_groups,
             "max_allowed": max_allowed,
             "columns_checked": columns,
         },
-        "message": (
+        (
             f"No excess duplicates found on {cols_sql}"
             if passed else
             f"{dup_groups} duplicate group(s) found on [{cols_sql}] in {table} "
             f"(max allowed: {max_allowed})"
         ),
-    }
-
-
-def _error(test: dict, msg: str) -> dict:
-    return {
-        "test_id": test["_test_id"],
-        "name": test["name"],
-        "type": "duplicate_check",
-        "status": "ERROR",
-        "severity": test.get("severity", "MEDIUM"),
-        "metrics": {},
-        "message": msg,
-    }
+    )

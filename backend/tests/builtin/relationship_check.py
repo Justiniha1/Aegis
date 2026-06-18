@@ -1,4 +1,7 @@
 from backend.core.database_connector import DatabaseConnector
+from backend.tests.builtin._common import InvalidIdentifier, error, result, safe_identifier, to_int
+
+TYPE = "relationship_check"
 
 
 def run(connector: DatabaseConnector, test: dict) -> dict:
@@ -17,7 +20,15 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
         if not value
     ]
     if missing:
-        return _error(test, f"Missing required field(s): {', '.join(missing)}")
+        return error(test, TYPE, f"Missing required field(s): {', '.join(missing)}")
+
+    try:
+        source_table = safe_identifier(source_table)
+        source_column = safe_identifier(source_column)
+        target_table = safe_identifier(target_table)
+        target_column = safe_identifier(target_column)
+    except InvalidIdentifier as e:
+        return error(test, TYPE, str(e))
 
     max_orphans = test.get("max_orphans", 0)
 
@@ -30,24 +41,21 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
     df_total = connector.execute_query(
         f"SELECT COUNT(*) AS total FROM {source_table}"
     )
-    orphan_count = int(df["orphan_count"].iloc[0])
-    total = int(df_total["total"].iloc[0])
+    orphan_count = to_int(df, "orphan_count")
+    total = to_int(df_total, "total")
     orphan_pct = orphan_count / total if total > 0 else 0.0
 
     passed = orphan_count <= max_orphans
-    return {
-        "test_id": test["_test_id"],
-        "name": test["name"],
-        "type": "relationship_check",
-        "status": "PASSED" if passed else "FAILED",
-        "severity": test.get("severity", "MEDIUM"),
-        "metrics": {
+    return result(
+        test, TYPE,
+        "PASSED" if passed else "FAILED",
+        {
             "total_source_rows": total,
             "orphan_count": orphan_count,
             "orphan_percentage": round(orphan_pct, 4),
             "max_orphans_allowed": max_orphans,
         },
-        "message": (
+        (
             f"{source_table}.{source_column} → {target_table}.{target_column}: "
             f"{orphan_count} orphan(s) — within allowed limit ({max_orphans})"
             if passed else
@@ -55,16 +63,4 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
             f"have no match in {target_table}.{target_column} "
             f"(max allowed: {max_orphans})"
         ),
-    }
-
-
-def _error(test: dict, msg: str) -> dict:
-    return {
-        "test_id": test["_test_id"],
-        "name": test["name"],
-        "type": "relationship_check",
-        "status": "ERROR",
-        "severity": test.get("severity", "MEDIUM"),
-        "metrics": {},
-        "message": msg,
-    }
+    )

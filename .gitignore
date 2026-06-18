@@ -12,8 +12,8 @@ db_data/
 test_check.db
 .pytest_cache/
 
-# CLI-scaffolded end-user state (aegis init) — not product source
-/aegis/
+# CLI-scaffolded end-user state (comet init) — not product source
+/comet/
 
 # Claude Code & GSD
 .claude/

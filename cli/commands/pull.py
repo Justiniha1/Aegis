@@ -2,7 +2,7 @@ from pathlib import Path
 import typer
 from ruamel.yaml import YAML
 from cli.config import load_config
-from cli.api_client import AegisClient
+from cli.api_client import CometClient
 
 
 def pull_cmd():
@@ -14,14 +14,14 @@ def pull_cmd():
     local config. If no local file exists yet, the server YAML is written as-is.
     """
     cfg = load_config()
-    client = AegisClient(api_url=cfg["api_url"], api_key=cfg["api_key"])
+    client = CometClient(api_url=cfg["api_url"], api_key=cfg["api_key"])
     try:
         server_yaml = client.get_text("/api/v1/tests/yaml")
     except Exception as e:
-        typer.echo(f"[aegis] Pull failed: {e}")
+        typer.echo(f"[comet] Pull failed: {e}")
         raise typer.Exit(1)
 
-    yaml_path = Path("aegis") / "test_definitions.yaml"
+    yaml_path = Path("comet") / "test_definitions.yaml"
     yaml = YAML()
     yaml.indent(mapping=2, sequence=2, offset=0)
     yaml.preserve_quotes = True
@@ -39,4 +39,4 @@ def pull_cmd():
 
     with open(yaml_path, "w", encoding="utf-8") as f:
         yaml.dump(doc, f)
-    typer.echo(f"[aegis] Pulled latest test definitions to {yaml_path}")
+    typer.echo(f"[comet] Pulled latest test definitions to {yaml_path}")

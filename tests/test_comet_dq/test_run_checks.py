@@ -1,11 +1,11 @@
-"""Unit tests for aegis_dq.run_checks().
+"""Unit tests for comet_dq.run_checks().
 
-Tests mock AegisAPIClient so no network or server is needed.
+Tests mock CometAPIClient so no network or server is needed.
 """
 import pytest
 from unittest.mock import MagicMock, patch
 
-from aegis_dq._run import run_checks, AegisDQChecksFailed, AegisDQRunTimeout
+from comet_dq._run import run_checks, CometDQChecksFailed, CometDQRunTimeout
 
 
 # ---------------------------------------------------------------------------
@@ -32,7 +32,7 @@ FAILED_RUN = {
 
 
 def _mock_client(run_id: int, final_run: dict) -> MagicMock:
-    """Return a mock AegisAPIClient that returns a fixed run_id and final_run dict."""
+    """Return a mock CometAPIClient that returns a fixed run_id and final_run dict."""
     client = MagicMock()
     client.trigger_run.return_value = run_id
     client.wait_for_run.return_value = final_run
@@ -44,10 +44,10 @@ def _mock_client(run_id: int, final_run: dict) -> MagicMock:
 # ---------------------------------------------------------------------------
 
 def test_run_checks_returns_run_dict_on_complete(monkeypatch):
-    monkeypatch.setenv("AEGIS_API_URL", "http://fake-aegis")
-    monkeypatch.setenv("AEGIS_API_KEY", "test-key")
+    monkeypatch.setenv("COMET_API_URL", "http://fake-comet")
+    monkeypatch.setenv("COMET_API_KEY", "test-key")
 
-    with patch("aegis_dq._run.AegisAPIClient", return_value=_mock_client(42, COMPLETE_RUN)):
+    with patch("comet_dq._run.CometAPIClient", return_value=_mock_client(42, COMPLETE_RUN)):
         result = run_checks(profile="dev")
 
     assert result["status"] == "COMPLETE"
@@ -55,10 +55,10 @@ def test_run_checks_returns_run_dict_on_complete(monkeypatch):
 
 
 def test_run_checks_does_not_raise_on_complete(monkeypatch):
-    monkeypatch.setenv("AEGIS_API_URL", "http://fake-aegis")
-    monkeypatch.setenv("AEGIS_API_KEY", "test-key")
+    monkeypatch.setenv("COMET_API_URL", "http://fake-comet")
+    monkeypatch.setenv("COMET_API_KEY", "test-key")
 
-    with patch("aegis_dq._run.AegisAPIClient", return_value=_mock_client(42, COMPLETE_RUN)):
+    with patch("comet_dq._run.CometAPIClient", return_value=_mock_client(42, COMPLETE_RUN)):
         # Should not raise
         run_checks(profile="dev")
 
@@ -68,11 +68,11 @@ def test_run_checks_does_not_raise_on_complete(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_run_checks_raises_on_failed_run(monkeypatch):
-    monkeypatch.setenv("AEGIS_API_URL", "http://fake-aegis")
-    monkeypatch.setenv("AEGIS_API_KEY", "test-key")
+    monkeypatch.setenv("COMET_API_URL", "http://fake-comet")
+    monkeypatch.setenv("COMET_API_KEY", "test-key")
 
-    with patch("aegis_dq._run.AegisAPIClient", return_value=_mock_client(43, FAILED_RUN)):
-        with pytest.raises(AegisDQChecksFailed) as exc_info:
+    with patch("comet_dq._run.CometAPIClient", return_value=_mock_client(43, FAILED_RUN)):
+        with pytest.raises(CometDQChecksFailed) as exc_info:
             run_checks(profile="dev")
 
     err = exc_info.value
@@ -82,13 +82,13 @@ def test_run_checks_raises_on_failed_run(monkeypatch):
 
 
 def test_checks_failed_exception_is_exception_subclass():
-    err = AegisDQChecksFailed(run_id=1, profile="prod", reason="bad data")
+    err = CometDQChecksFailed(run_id=1, profile="prod", reason="bad data")
     assert isinstance(err, Exception)
     assert not isinstance(err, SystemExit)
 
 
 def test_checks_failed_message_contains_profile_and_run_id():
-    err = AegisDQChecksFailed(run_id=7, profile="staging", reason="schema mismatch")
+    err = CometDQChecksFailed(run_id=7, profile="staging", reason="schema mismatch")
     msg = str(err)
     assert "staging" in msg
     assert "7" in msg
@@ -100,29 +100,29 @@ def test_checks_failed_message_contains_profile_and_run_id():
 
 def test_run_checks_passes_explicit_creds_to_client(monkeypatch):
     # Ensure env vars are absent so we can confirm explicit args are used
-    monkeypatch.delenv("AEGIS_API_URL", raising=False)
-    monkeypatch.delenv("AEGIS_API_KEY", raising=False)
+    monkeypatch.delenv("COMET_API_URL", raising=False)
+    monkeypatch.delenv("COMET_API_KEY", raising=False)
 
-    with patch("aegis_dq._run.AegisAPIClient") as mock_cls:
+    with patch("comet_dq._run.CometAPIClient") as mock_cls:
         mock_cls.return_value = _mock_client(42, COMPLETE_RUN)
         run_checks(profile="dev", api_url="http://custom-host", api_key="explicit-key")
         mock_cls.assert_called_once_with(api_url="http://custom-host", api_key="explicit-key")
 
 
 def test_run_checks_raises_value_error_when_creds_missing(monkeypatch):
-    monkeypatch.delenv("AEGIS_API_URL", raising=False)
-    monkeypatch.delenv("AEGIS_API_KEY", raising=False)
+    monkeypatch.delenv("COMET_API_URL", raising=False)
+    monkeypatch.delenv("COMET_API_KEY", raising=False)
 
     with pytest.raises(ValueError):
         run_checks(profile="dev")
 
 
 # ---------------------------------------------------------------------------
-# Timeout path: AegisDQRunTimeout (max_wait_seconds)
+# Timeout path: CometDQRunTimeout (max_wait_seconds)
 # ---------------------------------------------------------------------------
 
 def _timeout_client(run_id: int) -> MagicMock:
-    """Mock AegisAPIClient whose wait_for_run raises TimeoutError (deadline hit)."""
+    """Mock CometAPIClient whose wait_for_run raises TimeoutError (deadline hit)."""
     client = MagicMock()
     client.trigger_run.return_value = run_id
     client.wait_for_run.side_effect = TimeoutError("deadline exceeded")
@@ -130,11 +130,11 @@ def _timeout_client(run_id: int) -> MagicMock:
 
 
 def test_run_checks_raises_run_timeout_when_client_times_out(monkeypatch):
-    monkeypatch.setenv("AEGIS_API_URL", "http://fake-aegis")
-    monkeypatch.setenv("AEGIS_API_KEY", "test-key")
+    monkeypatch.setenv("COMET_API_URL", "http://fake-comet")
+    monkeypatch.setenv("COMET_API_KEY", "test-key")
 
-    with patch("aegis_dq._run.AegisAPIClient", return_value=_timeout_client(42)):
-        with pytest.raises(AegisDQRunTimeout) as exc_info:
+    with patch("comet_dq._run.CometAPIClient", return_value=_timeout_client(42)):
+        with pytest.raises(CometDQRunTimeout) as exc_info:
             run_checks(profile="dev", max_wait_seconds=30)
 
     err = exc_info.value
@@ -144,7 +144,7 @@ def test_run_checks_raises_run_timeout_when_client_times_out(monkeypatch):
 
 
 def test_run_timeout_exception_message_contains_profile_run_id_and_deadline():
-    err = AegisDQRunTimeout(profile="staging", run_id=99, max_wait_seconds=120)
+    err = CometDQRunTimeout(profile="staging", run_id=99, max_wait_seconds=120)
     msg = str(err)
     assert "staging" in msg
     assert "99" in msg
@@ -152,26 +152,26 @@ def test_run_timeout_exception_message_contains_profile_run_id_and_deadline():
 
 
 def test_run_timeout_is_exception_subclass():
-    err = AegisDQRunTimeout(profile="p", run_id=1, max_wait_seconds=60)
+    err = CometDQRunTimeout(profile="p", run_id=1, max_wait_seconds=60)
     assert isinstance(err, Exception)
     assert not isinstance(err, SystemExit)
 
 
 def test_run_checks_without_max_wait_seconds_does_not_raise_timeout(monkeypatch):
-    monkeypatch.setenv("AEGIS_API_URL", "http://fake-aegis")
-    monkeypatch.setenv("AEGIS_API_KEY", "test-key")
+    monkeypatch.setenv("COMET_API_URL", "http://fake-comet")
+    monkeypatch.setenv("COMET_API_KEY", "test-key")
 
-    with patch("aegis_dq._run.AegisAPIClient", return_value=_mock_client(42, COMPLETE_RUN)):
+    with patch("comet_dq._run.CometAPIClient", return_value=_mock_client(42, COMPLETE_RUN)):
         result = run_checks(profile="dev")
 
     assert result["status"] == "COMPLETE"
 
 
 def test_run_checks_passes_max_wait_seconds_to_wait_for_run(monkeypatch):
-    monkeypatch.setenv("AEGIS_API_URL", "http://fake-aegis")
-    monkeypatch.setenv("AEGIS_API_KEY", "test-key")
+    monkeypatch.setenv("COMET_API_URL", "http://fake-comet")
+    monkeypatch.setenv("COMET_API_KEY", "test-key")
 
-    with patch("aegis_dq._run.AegisAPIClient") as mock_cls:
+    with patch("comet_dq._run.CometAPIClient") as mock_cls:
         mock_cls.return_value = _mock_client(42, COMPLETE_RUN)
         run_checks(profile="dev", max_wait_seconds=45)
         call = mock_cls.return_value.wait_for_run.call_args

@@ -17,8 +17,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Aegis",
-  description: "Aegis — Monitor your data quality in real time",
+  title: "Comet",
+  description: "Comet — Monitor your data quality in real time",
 };
 
 export default function RootLayout({

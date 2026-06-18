@@ -96,7 +96,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
               color: "#FFFFFF",
               lineHeight: 1,
             }}
-            aria-label="Aegis"
+            aria-label="Comet"
           >
             Ae
           </div>
@@ -104,7 +104,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
             className="text-lg font-semibold"
             style={{ color: "#FFFFFF", letterSpacing: "-0.01em" }}
           >
-            Aegis
+            Comet
           </h1>
         </div>
 

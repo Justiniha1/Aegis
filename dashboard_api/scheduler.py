@@ -2,7 +2,7 @@
 
 Architecture notes (locked in 09-CONTEXT.md):
 - Single in-process AsyncIOScheduler: the Dockerfile CMD is already single-process and
-  single-replica. AEGIS_SCHEDULER_ENABLED is the seam to graduate to a dedicated worker
+  single-replica. COMET_SCHEDULER_ENABLED is the seam to graduate to a dedicated worker
   later; for now it gates whether THIS process runs the poller (prevents double-fire on
   multi-replica deploys if the env var is set to 1 only on one instance).
 - Table-as-source-of-truth: no APScheduler job store. The Schedule table is the only
@@ -16,9 +16,11 @@ Architecture notes (locked in 09-CONTEXT.md):
 - Skip-missed: next_run_at is always rolled forward by exactly one interval (compute_next_run)
   regardless of how far in the past it was, so a long downtime never causes a catch-up burst.
 """
+import logging
 from datetime import datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from sqlalchemy.exc import IntegrityError
 from starlette.concurrency import run_in_threadpool
 
 from dashboard_api.database import SessionLocal
@@ -26,6 +28,8 @@ from dashboard_api import models
 from dashboard_api.run_executor import execute_run
 from dashboard_api.queries import active_run
 from dashboard_api.schedule_logic import compute_next_run
+
+logger = logging.getLogger(__name__)
 
 _scheduler = AsyncIOScheduler(timezone="UTC")
 
@@ -69,7 +73,10 @@ async def poll_due_schedules() -> None:
                 # Deleted between the scan and now — skip.
                 continue
 
-            # D-09 active-run guard: shared with runs.py via queries.active_run.
+            # D-09 active-run guard: shared with runs.py via queries.active_run. The
+            # partial unique index is the real backstop — if a manual trigger raced and
+            # created the active run between our check and insert, the commit raises
+            # IntegrityError; treat that as "already active" and just roll next_run_at forward.
             dispatched = False
             if active_run(db, sched.client_id) is None:
                 run = models.Run(
@@ -81,31 +88,40 @@ async def poll_due_schedules() -> None:
                     completed_tests=0,
                 )
                 db.add(run)
-                db.commit()
-                db.refresh(run)
+                raced = False
                 try:
-                    # Dispatch to the threadpool — execute_run is synchronous.
-                    await run_in_threadpool(
-                        execute_run,
-                        run_id=run.id,
-                        client_id=sched.client_id,
-                        profile=sched.profile,
-                        type_filter=None,
-                    )
-                except Exception as dispatch_err:
-                    # execute_run is contracted never to raise, but if it does the Run
-                    # row is already committed as QUEUED. Leaving it QUEUED would make the
-                    # active-run guard above suppress every future scheduled run for this
-                    # client forever (silent deadlock). Mark it FAILED so the client is not
-                    # permanently blocked.
+                    db.commit()
+                except IntegrityError:
+                    # A manual trigger created the active run first; skip and roll forward.
                     db.rollback()
-                    stuck = db.query(models.Run).filter(models.Run.id == run.id).first()
-                    if stuck is not None and stuck.status in ("QUEUED", "RUNNING"):
-                        stuck.status = "FAILED"
-                        stuck.error_reason = f"scheduler dispatch failed: {dispatch_err}"
-                        stuck.completed_at = datetime.utcnow()
-                        db.commit()
-                dispatched = True
+                    raced = True
+
+                if not raced:
+                    db.refresh(run)
+                    dispatched = True
+                    try:
+                        # Dispatch to the threadpool — execute_run is synchronous.
+                        await run_in_threadpool(
+                            execute_run,
+                            run_id=run.id,
+                            client_id=sched.client_id,
+                            profile=sched.profile,
+                            type_filter=None,
+                            alert=True,  # scheduled run — notify the client on failure
+                        )
+                    except Exception as dispatch_err:
+                        # execute_run is contracted never to raise, but if it does the Run
+                        # row is already committed as QUEUED. Leaving it QUEUED would make the
+                        # active-run guard above suppress every future scheduled run for this
+                        # client forever (silent deadlock). Mark it FAILED so the client is not
+                        # permanently blocked.
+                        db.rollback()
+                        stuck = db.query(models.Run).filter(models.Run.id == run.id).first()
+                        if stuck is not None and stuck.status in ("QUEUED", "RUNNING"):
+                            stuck.status = "FAILED"
+                            stuck.error_reason = f"scheduler dispatch failed: {dispatch_err}"
+                            stuck.completed_at = datetime.utcnow()
+                            db.commit()
 
             # Always roll next_run_at forward — skip-missed, no catch-up burst.
             # Apply even when we skipped due to an active run, so we do not hot-loop.
@@ -124,7 +140,7 @@ async def poll_due_schedules() -> None:
             db.commit()
 
         except Exception as e:
-            print(f"[warn] schedule id={sched_id} failed: {e}")
+            logger.warning("schedule id=%s failed: %s", sched_id, e)
             try:
                 db.rollback()
             except Exception:

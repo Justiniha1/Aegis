@@ -6,11 +6,11 @@ product
 
 ## Users
 
-Data operators and client teams who own a dataset's health. They open Aegis to answer one question fast: "is my data OK right now, and if not, what broke?" Context is a working session, often glancing between Aegis and other tools, sometimes triaging a failed scheduled run. They are technical enough to read a table name, a SQL snippet, and a metric, but they are not living in the tool all day.
+Data operators and client teams who own a dataset's health. They open Comet to answer one question fast: "is my data OK right now, and if not, what broke?" Context is a working session, often glancing between Comet and other tools, sometimes triaging a failed scheduled run. They are technical enough to read a table name, a SQL snippet, and a metric, but they are not living in the tool all day.
 
 ## Product Purpose
 
-Aegis runs data-quality checks against a client's database (on demand or scheduled) and shows the results. Success is: an operator can see at a glance whether their data is healthy, and act on what's broken, without digging. The History surface specifically answers "what happened across past runs, and why did a given run fail or produce failures?"
+Comet runs data-quality checks against a client's database (on demand or scheduled) and shows the results. Success is: an operator can see at a glance whether their data is healthy, and act on what's broken, without digging. The History surface specifically answers "what happened across past runs, and why did a given run fail or produce failures?"
 
 ## Brand Personality
 

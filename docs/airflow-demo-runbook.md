@@ -1,16 +1,16 @@
 # Airflow Demo Runbook - Hosted DAG-Triggered Run
 
-A live sales demo: an Airflow DAG triggers a real Aegis run on the hosted website
+A live sales demo: an Airflow DAG triggers a real Comet run on the hosted website
 against a seeded demo Postgres. The prospect sees the DAG definition, watches it run
-green, then sees the run land in the Aegis dashboard.
+green, then sees the run land in the Comet dashboard.
 
 ## What it proves
-"You orchestrate Aegis from your own pipeline - a few lines of DAG, pointed at your
-Aegis account, and your data-quality gate runs in our hosted engine."
+"You orchestrate Comet from your own pipeline - a few lines of DAG, pointed at your
+Comet account, and your data-quality gate runs in our hosted engine."
 
 ## Architecture
-Airflow runs the DAG, which uses AegisDQOperator(profile="demo") to call trigger_run on
-the hosted Aegis API. The hosted engine runs the checks against the demo Postgres and the
+Airflow runs the DAG, which uses CometDQOperator(profile="demo") to call trigger_run on
+the hosted Comet API. The hosted engine runs the checks against the demo Postgres and the
 run shows up in the dashboard. Where Airflow itself runs (your laptop via Docker, or a
 hosted Railway service) does not change this - the run always executes on the hosted site.
 
@@ -25,7 +25,7 @@ hosted Railway service) does not change this - the run always executes on the ho
 ## One-time setup (shared by both methods)
 
 ### 1. Create the demo Postgres (Railway)
-1. In the Aegis Railway project: + New, then Database, then PostgreSQL. Name it demo-db.
+1. In the Comet Railway project: + New, then Database, then PostgreSQL. Name it demo-db.
 2. Load the seed using the Python loader (works without psql). Use the demo-db PUBLIC
    URL (host ends in .proxy.rlwy.net), not the internal *.railway.internal host:
      python -m pip install psycopg2-binary
@@ -47,12 +47,12 @@ The api service redeploys automatically.
 ### 3. Create a demo client and push the demo config
 1. Create a demo client account and copy its API key (POST /api/v1/clients; see DEPLOY.md).
    The api_key is shown once - save it.
-2. Push the demo profile and tests to that client. The CLI reads ./aegis/* relative to the
+2. Push the demo profile and tests to that client. The CLI reads ./comet/* relative to the
    working directory, so push from deploy/demo. The CLI always targets the hosted API (the
    URL is baked in and not configurable), so you only set the key:
      cd deploy/demo
-     $env:AEGIS_API_KEY = "<demo client key>"
-     aegis push
+     $env:COMET_API_KEY = "<demo client key>"
+     comet push
      cd ..\..
    This uploads the demo Postgres profile and the 5 guaranteed-green checks.
 
@@ -65,14 +65,14 @@ free (any normal laptop is fine).
 
 1. Start Docker Desktop and wait until it reports Running.
 2. Build the image (first build ~3-5 min, one time), from the repo root:
-     docker build -f deploy/airflow/Dockerfile -t aegis-demo-airflow .
+     docker build -f deploy/airflow/Dockerfile -t comet-demo-airflow .
 3. Run it (paste the demo client key):
      docker run --rm -p 8080:8080 `
-       -e AEGIS_API_KEY="<demo client key>" `
+       -e COMET_API_KEY="<demo client key>" `
        -e AIRFLOW__CORE__LOAD_EXAMPLES="False" `
        -e AIRFLOW__WEBSERVER__WORKERS="1" `
-       aegis-demo-airflow
-   - No AEGIS_API_URL needed: the baked default points at the hosted api, so the run fires
+       comet-demo-airflow
+   - No COMET_API_URL needed: the baked default points at the hosted api, so the run fires
      on the website. (Same "client only sets the API key" story.)
    - Boot takes ~1-2 minutes. The webserver prints a lot of "Added Permission..." lines,
      then goes quiet - that is normal, it is NOT stuck. Wait for the webserver to finish.
@@ -87,13 +87,13 @@ free (any normal laptop is fine).
 ---
 
 ## Live demo script
-1. Open the Airflow UI (http://localhost:8080 for Method A), go to DAGs, open aegis_demo.
-2. Unpause aegis_demo (toggle on the left) if it is paused.
+1. Open the Airflow UI (http://localhost:8080 for Method A), go to DAGs, open comet_demo.
+2. Unpause comet_demo (toggle on the left) if it is paused.
 3. Open the Code tab: "This is the whole integration - one operator, pointed at your
-   Aegis account."
+   Comet account."
 4. Click Trigger DAG. Switch to the Graph (or Grid) view and watch
    run_demo_quality_checks go green (about 5-10 seconds).
-5. Switch to the Aegis dashboard, log in as the demo client, open Runs: the new run
+5. Switch to the Comet dashboard, log in as the demo client, open Runs: the new run
    appears with status COMPLETE and all 5 checks passed.
 
 ## Reset between demos
@@ -101,8 +101,8 @@ free (any normal laptop is fine).
 - Re-trigger the DAG.
 
 ## Troubleshooting
-- aegis push appears to do nothing / wrong target: confirm you are in deploy/demo (the CLI
-  reads ./aegis/* relative to the working directory) and that AEGIS_API_KEY is set. The API
+- comet push appears to do nothing / wrong target: confirm you are in deploy/demo (the CLI
+  reads ./comet/* relative to the working directory) and that COMET_API_KEY is set. The API
   URL is fixed to the hosted endpoint and cannot be repointed.
 - Airflow UI looks frozen on "Added Permission..." lines: it is not frozen; the webserver
   is still booting. Confirm with: docker ps (status should be Up) and
@@ -119,10 +119,10 @@ webserver gets OOM-killed in a boot loop (this was confirmed: memory climbs to ~
 the container is killed, restarts, and never serves). If you have the headroom:
 
 1. + New, then GitHub Repo (same repo). In Settings -> Source set:
-   - Root Directory = / (repo root, so the Docker build context includes aegis_dq/)
+   - Root Directory = / (repo root, so the Docker build context includes comet_dq/)
    - Config-as-code file path = deploy/airflow/railway.toml
 2. Variables:
-   - AEGIS_API_KEY = the demo client key
+   - COMET_API_KEY = the demo client key
    - AIRFLOW__CORE__LOAD_EXAMPLES = False
    - AIRFLOW__WEBSERVER__WORKERS = 1
    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN =

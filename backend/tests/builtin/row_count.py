@@ -1,4 +1,7 @@
 from backend.core.database_connector import DatabaseConnector
+from backend.tests.builtin._common import InvalidIdentifier, error, result, safe_identifier, to_int
+
+TYPE = "row_count"
 
 
 def _date_where(dialect: str, date_column: str, timeframe: str) -> str:
@@ -35,7 +38,7 @@ def _date_where(dialect: str, date_column: str, timeframe: str) -> str:
 def run(connector: DatabaseConnector, test: dict) -> dict:
     table = test.get("table", "").strip()
     if not table:
-        return _error(test, "Missing required field: table")
+        return error(test, TYPE, "Missing required field: table")
 
     min_rows = test.get("min_rows")
     max_rows = test.get("max_rows")
@@ -43,10 +46,17 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
     date_column = test.get("date_column")
 
     if min_rows is None and max_rows is None:
-        return _error(test, "At least one of min_rows or max_rows must be specified")
+        return error(test, TYPE, "At least one of min_rows or max_rows must be specified")
 
     if timeframe != "all_time" and not date_column:
-        return _error(test, f"date_column is required when timeframe is '{timeframe}'")
+        return error(test, TYPE, f"date_column is required when timeframe is '{timeframe}'")
+
+    try:
+        table = safe_identifier(table)
+        if timeframe != "all_time" and date_column:
+            date_column = safe_identifier(date_column)
+    except InvalidIdentifier as e:
+        return error(test, TYPE, str(e))
 
     where_clause = ""
     if timeframe != "all_time" and date_column:
@@ -56,7 +66,7 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
     df = connector.execute_query(
         f"SELECT COUNT(*) AS row_count FROM {table} {where_clause}"
     )
-    count = int(df["row_count"].iloc[0])
+    count = to_int(df, "row_count")
 
     failures = []
     if min_rows is not None and count < min_rows:
@@ -65,33 +75,18 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
         failures.append(f"count ({count}) > max_rows ({max_rows})")
 
     passed = len(failures) == 0
-    return {
-        "test_id": test["_test_id"],
-        "name": test["name"],
-        "type": "row_count",
-        "status": "PASSED" if passed else "FAILED",
-        "severity": test.get("severity", "MEDIUM"),
-        "metrics": {
+    return result(
+        test, TYPE,
+        "PASSED" if passed else "FAILED",
+        {
             "row_count": count,
             "min_rows": min_rows,
             "max_rows": max_rows,
             "timeframe": timeframe,
         },
-        "message": (
+        (
             f"{table} has {count} rows — within expected range"
             if passed else
             f"{table} row count check failed: " + "; ".join(failures)
         ),
-    }
-
-
-def _error(test: dict, msg: str) -> dict:
-    return {
-        "test_id": test["_test_id"],
-        "name": test["name"],
-        "type": "row_count",
-        "status": "ERROR",
-        "severity": test.get("severity", "MEDIUM"),
-        "metrics": {},
-        "message": msg,
-    }
+    )
