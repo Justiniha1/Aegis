@@ -7,23 +7,23 @@ runner = CliRunner()
 
 
 @pytest.fixture()
-def aegis_project(tmp_path, monkeypatch):
+def comet_project(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("AEGIS_API_KEY", "test-key")
-    aegis = tmp_path / "aegis"
-    aegis.mkdir()
-    (aegis / "config.yaml").write_text("api_url: https://api.aegis-dq.com\ndefault_profile: production\n")
-    (aegis / "test_definitions.yaml").write_text("settings:\n  default_profile: production\ntests: []\n")
+    monkeypatch.setenv("COMET_API_KEY", "test-key")
+    comet = tmp_path / "comet"
+    comet.mkdir()
+    (comet / "config.yaml").write_text("api_url: https://api.comet-dq.com\ndefault_profile: production\n")
+    (comet / "test_definitions.yaml").write_text("settings:\n  default_profile: production\ntests: []\n")
     return tmp_path
 
 
-def test_run_triggers_api_and_polls_complete(aegis_project):
+def test_run_triggers_api_and_polls_complete(comet_project):
     poll_responses = [
         {"status": "QUEUED", "completed_tests": 0, "total_tests": 2},
         {"status": "RUNNING", "completed_tests": 1, "total_tests": 2},
         {"status": "COMPLETE", "completed_tests": 2, "total_tests": 2},
     ]
-    with patch("cli.commands.run_cmd.AegisClient") as MockClient:
+    with patch("cli.commands.run_cmd.CometClient") as MockClient:
         mock = MockClient.return_value
         mock.post.return_value = {"run_id": 42, "status": "QUEUED"}
         mock.get.side_effect = poll_responses
@@ -32,8 +32,8 @@ def test_run_triggers_api_and_polls_complete(aegis_project):
     mock.post.assert_called_once_with("/api/v1/runs", json={"profile": "production"})
 
 
-def test_run_exits_1_on_failed(aegis_project):
-    with patch("cli.commands.run_cmd.AegisClient") as MockClient:
+def test_run_exits_1_on_failed(comet_project):
+    with patch("cli.commands.run_cmd.CometClient") as MockClient:
         mock = MockClient.return_value
         mock.post.return_value = {"run_id": 7, "status": "QUEUED"}
         mock.get.return_value = {"status": "FAILED", "error_reason": "No tests configured", "completed_tests": 0, "total_tests": 0}
@@ -41,9 +41,9 @@ def test_run_exits_1_on_failed(aegis_project):
     assert result.exit_code == 1
 
 
-def test_run_uses_default_profile_from_yaml(aegis_project):
+def test_run_uses_default_profile_from_yaml(comet_project):
     """With no --profile, run falls back to settings.default_profile in the YAML."""
-    with patch("cli.commands.run_cmd.AegisClient") as MockClient:
+    with patch("cli.commands.run_cmd.CometClient") as MockClient:
         mock = MockClient.return_value
         mock.post.return_value = {"run_id": 1, "status": "QUEUED"}
         mock.get.return_value = {"status": "COMPLETE", "completed_tests": 0, "total_tests": 0}
@@ -55,19 +55,19 @@ def test_run_uses_default_profile_from_yaml(aegis_project):
 def test_run_no_profile_and_no_default_errors(tmp_path, monkeypatch):
     """No --profile and no settings.default_profile → clear error, run not started."""
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("AEGIS_API_KEY", "test-key")
-    aegis = tmp_path / "aegis"
-    aegis.mkdir()
-    (aegis / "test_definitions.yaml").write_text("tests: []\n")  # no settings.default_profile
-    with patch("cli.commands.run_cmd.AegisClient") as MockClient:
+    monkeypatch.setenv("COMET_API_KEY", "test-key")
+    comet = tmp_path / "comet"
+    comet.mkdir()
+    (comet / "test_definitions.yaml").write_text("tests: []\n")  # no settings.default_profile
+    with patch("cli.commands.run_cmd.CometClient") as MockClient:
         result = runner.invoke(app, ["run"])
         MockClient.return_value.post.assert_not_called()
     assert result.exit_code == 1
     assert "default_profile" in result.output
 
 
-def test_status_prints_last_run(aegis_project):
-    with patch("cli.commands.status.AegisClient") as MockClient:
+def test_status_prints_last_run(comet_project):
+    with patch("cli.commands.status.CometClient") as MockClient:
         mock = MockClient.return_value
         mock.get.return_value = [
             {"id": 5, "status": "COMPLETE", "profile": "production",

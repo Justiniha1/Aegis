@@ -7,7 +7,7 @@ endif
 
 help:
 	@echo ""
-	@echo "  Aegis Data Quality Framework"
+	@echo "  Comet Data Quality Framework"
 	@echo ""
 	@echo "  make start   — Start the dashboard (API + frontend)"
 	@echo "  make seed    — Load demo data and run the engine once"

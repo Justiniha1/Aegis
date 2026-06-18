@@ -1,5 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from dashboard_api.limiter import limiter, RUNS_LIMIT_STRING
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from dashboard_api import models, schemas
@@ -8,21 +9,12 @@ from dashboard_api.database import get_db
 from dashboard_api.run_executor import execute_run
 from dashboard_api.queries import enabled_tests_query, active_run
 from dashboard_api import connection_source
+from dashboard_api.constants import TEST_TYPES
 
 router = APIRouter(prefix="/api/v1/runs", tags=["runs"])
 
-# The 8 builtin test types — must match TYPE_LABELS keys in frontend/src/lib/constants.ts.
 # Server-side whitelist for type_filter input validation (security_constraints).
-_ALLOWED_TYPE_FILTERS = frozenset({
-    "null_check",
-    "duplicate_check",
-    "unique_check",
-    "row_count",
-    "schema_check",
-    "range_check",
-    "relationship_check",
-    "custom_sql",
-})
+_ALLOWED_TYPE_FILTERS = TEST_TYPES
 
 
 def _to_run_out(r: models.Run) -> schemas.RunOut:
@@ -106,7 +98,9 @@ def trigger_run(
             detail="A run is already in progress",
         )
 
-    # Create the Run row.
+    # Create the Run row. The active_run check above is advisory; the partial unique
+    # index is the real guard — a concurrent insert raises IntegrityError, which we map
+    # to the same 409 so a race can never produce two active runs for one client.
     run = models.Run(
         client_id=client.id,
         profile=body.profile,
@@ -116,7 +110,11 @@ def trigger_run(
         completed_tests=0,
     )
     db.add(run)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="A run is already in progress")
     db.refresh(run)
 
     # Schedule the engine run. BackgroundTasks runs AFTER this response is sent

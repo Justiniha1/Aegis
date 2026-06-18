@@ -1,6 +1,9 @@
 from sqlalchemy import inspect as sa_inspect
 
 from backend.core.database_connector import DatabaseConnector
+from backend.tests.builtin._common import InvalidIdentifier, error, result, safe_identifier
+
+TYPE = "schema_check"
 
 TYPE_MAP = {
     "integer": {"int", "bigint", "smallint"},
@@ -21,13 +24,18 @@ def _type_matches(sa_type_str: str, expected: str) -> bool:
 def run(connector: DatabaseConnector, test: dict) -> dict:
     table = test.get("table", "").strip()
     if not table:
-        return _error(test, "Missing required field: table")
+        return error(test, TYPE, "Missing required field: table")
+
+    try:
+        table = safe_identifier(table)
+    except InvalidIdentifier as e:
+        return error(test, TYPE, str(e))
 
     expected_columns = test.get("expected_columns") or {}
     if not expected_columns:
-        return _error(test, "expected_columns must be provided and non-empty")
+        return error(test, TYPE, "expected_columns must be provided and non-empty")
     if not isinstance(expected_columns, dict):
-        return _error(test, "expected_columns must be a mapping of column_name: type")
+        return error(test, TYPE, "expected_columns must be a mapping of column_name: type")
 
     inspector = sa_inspect(connector.get_sqlalchemy_engine())
     try:
@@ -36,7 +44,7 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
             for col in inspector.get_columns(table)
         }
     except Exception as e:
-        return _error(test, f"Could not inspect table '{table}': {e}")
+        return error(test, TYPE, f"Could not inspect table '{table}': {e}")
 
     missing = []
     type_mismatches = []
@@ -56,33 +64,20 @@ def run(connector: DatabaseConnector, test: dict) -> dict:
         [f"Type mismatches: {type_mismatches}"] if type_mismatches else []
     )
 
-    return {
-        "test_id": test["_test_id"],
-        "name": test["name"],
-        "type": "schema_check",
-        "status": "PASSED" if passed else "FAILED",
-        "severity": test.get("severity", "MEDIUM"),
-        "metrics": {
+    # Data-residency: report only on the columns the client declared in expected_columns.
+    # The full discovered column list (actual_cols) is intentionally NOT emitted — it would
+    # disclose schema the client never asked to involve (e.g. an undeclared PII column).
+    return result(
+        test, TYPE,
+        "PASSED" if passed else "FAILED",
+        {
             "expected_columns": list(expected_columns.keys()),
-            "actual_columns": list(actual_cols.keys()),
             "missing_columns": missing,
             "type_mismatches": type_mismatches,
         },
-        "message": (
+        (
             f"{table} schema matches expectations"
             if passed else
             f"{table} schema issues: " + "; ".join(issues)
         ),
-    }
-
-
-def _error(test: dict, msg: str) -> dict:
-    return {
-        "test_id": test["_test_id"],
-        "name": test["name"],
-        "type": "schema_check",
-        "status": "ERROR",
-        "severity": test.get("severity", "MEDIUM"),
-        "metrics": {},
-        "message": msg,
-    }
+    )

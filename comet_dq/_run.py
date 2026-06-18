@@ -1,4 +1,4 @@
-"""aegis_dq._run — core run_checks() callable.
+"""comet_dq._run — core run_checks() callable.
 
 This is the only module clients should call directly. Everything else is internal.
 """
@@ -6,17 +6,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from aegis_dq._client import AegisAPIClient
+from comet_dq._client import CometAPIClient
 
 
-class AegisDQChecksFailed(Exception):
+class CometDQChecksFailed(Exception):
     """Raised by run_checks() when one or more data-quality checks fail.
 
     Airflow treats any raised exception as a task failure, so this exception
     automatically blocks downstream tasks.
 
     Attributes:
-        run_id:  The integer run ID on the Aegis server.
+        run_id:  The integer run ID on the Comet server.
         profile: The connection profile that was run.
         reason:  Human-readable failure reason from the server.
     """
@@ -26,18 +26,18 @@ class AegisDQChecksFailed(Exception):
         self.profile = profile
         self.reason = reason
         super().__init__(
-            f"Aegis DQ checks failed for profile '{profile}' "
+            f"Comet DQ checks failed for profile '{profile}' "
             f"(run_id={run_id}): {reason}"
         )
 
 
-class AegisDQRunTimeout(Exception):
+class CometDQRunTimeout(Exception):
     """Raised by run_checks() when the run has not reached a terminal state
     within the max_wait_seconds deadline.
 
     Attributes:
         profile:          The connection profile that was run.
-        run_id:           The integer run ID on the Aegis server.
+        run_id:           The integer run ID on the Comet server.
         max_wait_seconds: The deadline that was exceeded, in seconds.
     """
 
@@ -46,7 +46,7 @@ class AegisDQRunTimeout(Exception):
         self.run_id = run_id
         self.max_wait_seconds = max_wait_seconds
         super().__init__(
-            f"Aegis DQ run for profile '{profile}' (run_id={run_id}) "
+            f"Comet DQ run for profile '{profile}' (run_id={run_id}) "
             f"did not complete within {max_wait_seconds}s"
         )
 
@@ -62,8 +62,8 @@ def run_checks(
 ) -> dict[str, Any]:
     """Trigger a data-quality run and wait for it to complete.
 
-    The API key is read from the AEGIS_API_KEY environment variable by default.
-    The API URL is fixed (the hosted Aegis endpoint, baked into the SDK) and is not
+    The API key is read from the COMET_API_KEY environment variable by default.
+    The API URL is fixed (the hosted Comet endpoint, baked into the SDK) and is not
     configurable. Pass ``api_key`` directly to override the env var (useful in tests or
     when the key comes from an Airflow Variable); ``api_url`` is an internal/testing override.
 
@@ -73,22 +73,22 @@ def run_checks(
                           None means all enabled tests.
         poll_interval:    Seconds between status polls (default: 5).
         api_url:          Internal/testing override for the (fixed) hosted API URL.
-        api_key:          Override the AEGIS_API_KEY env var.
-        max_wait_seconds: Optional hard deadline in seconds. Raises AegisDQRunTimeout
+        api_key:          Override the COMET_API_KEY env var.
+        max_wait_seconds: Optional hard deadline in seconds. Raises CometDQRunTimeout
                           if the run has not reached a terminal state within this
                           deadline. None (default) polls indefinitely.
 
     Returns:
-        The final run dict from the Aegis API (contains id, status,
+        The final run dict from the Comet API (contains id, status,
         total_tests, completed_tests, error, etc.).
 
     Raises:
-        AegisDQChecksFailed: When the run completes with status "FAILED".
-        AegisDQRunTimeout:   When max_wait_seconds is set and the deadline is exceeded.
+        CometDQChecksFailed: When the run completes with status "FAILED".
+        CometDQRunTimeout:   When max_wait_seconds is set and the deadline is exceeded.
         ValueError:          When credentials are missing.
         requests.HTTPError:  When the API returns a 4xx or 5xx response.
     """
-    client = AegisAPIClient(api_url=api_url, api_key=api_key)
+    client = CometAPIClient(api_url=api_url, api_key=api_key)
     run_id = client.trigger_run(profile=profile, type_filter=type_filter)
 
     try:
@@ -96,13 +96,13 @@ def run_checks(
             run_id=run_id, poll_interval=poll_interval, max_wait_seconds=max_wait_seconds
         )
     except TimeoutError:
-        raise AegisDQRunTimeout(
+        raise CometDQRunTimeout(
             profile=profile, run_id=run_id, max_wait_seconds=max_wait_seconds
         )
 
     if run.get("status") == "FAILED":
         error = run.get("error") or {}
         reason = error.get("reason") or "unknown error"
-        raise AegisDQChecksFailed(run_id=run_id, profile=profile, reason=reason)
+        raise CometDQChecksFailed(run_id=run_id, profile=profile, reason=reason)
 
     return run

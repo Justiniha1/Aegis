@@ -4,14 +4,14 @@ from typing import Optional
 import typer
 import yaml
 from cli.config import load_config
-from cli.api_client import AegisClient
+from cli.api_client import CometClient
 
 POLL_INTERVAL = 3  # seconds between status polls
 
 
 def _default_profile_from_yaml() -> Optional[str]:
-    """Read settings.default_profile from the local aegis/test_definitions.yaml, if set."""
-    path = Path("aegis") / "test_definitions.yaml"
+    """Read settings.default_profile from the local comet/test_definitions.yaml, if set."""
+    path = Path("comet") / "test_definitions.yaml"
     if not path.exists():
         return None
     try:
@@ -23,21 +23,21 @@ def _default_profile_from_yaml() -> Optional[str]:
 
 
 def run_cmd(
-    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Connection profile to run (defaults to settings.default_profile in aegis/test_definitions.yaml)"),
+    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Connection profile to run (defaults to settings.default_profile in comet/test_definitions.yaml)"),
     suite: Optional[str] = typer.Option(None, "--suite", "-s", help="Named test suite to run"),
     no_wait: bool = typer.Option(False, "--no-wait", help="Trigger run and exit without polling"),
 ):
-    """Trigger a data quality run on the Aegis servers.
+    """Trigger a data quality run on the Comet servers.
 
     With no --profile, falls back to `settings.default_profile` in the local
-    aegis/test_definitions.yaml. If neither is set, the run is not started.
+    comet/test_definitions.yaml. If neither is set, the run is not started.
     """
     cfg = load_config()
     selected_profile = profile or _default_profile_from_yaml()
     if not selected_profile:
         typer.echo(
-            "[aegis] No profile given and no 'default_profile' set under 'settings' in "
-            "aegis/test_definitions.yaml.\n"
+            "[comet] No profile given and no 'default_profile' set under 'settings' in "
+            "comet/test_definitions.yaml.\n"
             "        Pass --profile <name>, or add:\n"
             "          settings:\n"
             "            default_profile: <name>"
@@ -48,27 +48,27 @@ def run_cmd(
     if suite:
         payload["suite"] = suite
 
-    client = AegisClient(api_url=cfg["api_url"], api_key=cfg["api_key"])
+    client = CometClient(api_url=cfg["api_url"], api_key=cfg["api_key"])
 
     try:
         resp = client.post("/api/v1/runs", json=payload)
     except Exception as e:
-        typer.echo(f"[aegis] Failed to trigger run: {e}")
+        typer.echo(f"[comet] Failed to trigger run: {e}")
         raise typer.Exit(1)
 
     run_id = resp["run_id"]
-    typer.echo(f"[aegis] Run #{run_id} triggered (profile: {selected_profile})")
+    typer.echo(f"[comet] Run #{run_id} triggered (profile: {selected_profile})")
 
     if no_wait:
-        typer.echo(f"[aegis] Track it at: {cfg['api_url'].replace('api.', 'app.')}/dashboard/history")
+        typer.echo(f"[comet] Track it at: {cfg['api_url'].replace('api.', 'app.')}/dashboard/history")
         return
 
-    typer.echo("[aegis] Waiting for run to complete...")
+    typer.echo("[comet] Waiting for run to complete...")
     while True:
         try:
             status = client.get(f"/api/v1/runs/{run_id}")
         except Exception as e:
-            typer.echo(f"[aegis] Status poll failed: {e}")
+            typer.echo(f"[comet] Status poll failed: {e}")
             raise typer.Exit(1)
 
         state = status["status"]
@@ -80,10 +80,10 @@ def run_cmd(
         if state == "COMPLETE":
             # COMPLETE means the run finished, not that every test passed — the run
             # dict carries no pass count, so report tests run and point at the dashboard.
-            typer.echo(f"\n[aegis] Run #{run_id} complete — {total} tests run. See the dashboard for pass/fail detail.")
+            typer.echo(f"\n[comet] Run #{run_id} complete — {total} tests run. See the dashboard for pass/fail detail.")
             return
         if state == "FAILED":
-            typer.echo(f"\n[aegis] Run #{run_id} failed: {status.get('error_reason', 'unknown error')}")
+            typer.echo(f"\n[comet] Run #{run_id} failed: {status.get('error_reason', 'unknown error')}")
             raise typer.Exit(1)
 
         time.sleep(POLL_INTERVAL)

@@ -97,9 +97,15 @@ class DatabaseConnector:
         url = build_connection_url(profile)
         self._engine: Engine = create_engine(url)
 
-    def execute_query(self, sql: str) -> pd.DataFrame:
+    def execute_query(self, sql: str, params: dict | None = None) -> pd.DataFrame:
+        """Run a read query and return a DataFrame.
+
+        `params` are bound as SQL parameters (e.g. {"min_value": 0}) so caller-supplied
+        VALUES never need string interpolation. Identifiers (table/column names) cannot
+        be bound and must be validated by the caller before being formatted into `sql`.
+        """
         with self._engine.connect() as conn:
-            return pd.read_sql(text(sql), conn)
+            return pd.read_sql(text(sql), conn, params=params or {})
 
     def get_sqlalchemy_engine(self) -> Engine:
         return self._engine

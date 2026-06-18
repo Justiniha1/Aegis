@@ -1,4 +1,4 @@
-# Aegis Design Language
+# Comet Design Language
 
 **Locked in Phase 1.1 (2026-05-17). Phase 2 and beyond consume these tokens — do not re-derive.**
 
@@ -92,7 +92,7 @@ For any page with a dense form, encapsulate input / select / label styling in th
 
 ## Phase 1 carry-forward locks (do not break)
 
-- "Aegis" everywhere user-visible. Logo monogram = "Ae" in teal square (D-09).
+- "Comet" everywhere user-visible. Logo monogram = "Ae" in teal square (D-09).
 - `TYPE_LABELS` / `SEVERITY_LABELS` / `STATUS_LABELS` from `constants.ts` for system enum rendering.
 - **User-supplied strings render verbatim** — no `.replace`, no auto-derivation of `{table}.{type}` from test names. Test names render in JetBrains Mono.
 - Custom SQL renders as `<pre><code>` block in the Tests expand row.

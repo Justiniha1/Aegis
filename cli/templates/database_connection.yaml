@@ -1,5 +1,5 @@
-# Aegis connection profiles
-# Edit this file and run 'aegis push' to sync profiles to your dashboard.
+# Comet connection profiles
+# Edit this file and run 'comet push' to sync profiles to your dashboard.
 #
 # Each profile needs a connection_url in SQLAlchemy URL format:
 #   SQLite:     sqlite:////absolute/path/to/database.db

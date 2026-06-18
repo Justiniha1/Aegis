@@ -1,4 +1,4 @@
-# Railway config for the Aegis api service (build context = repo root).
+# Railway config for the Comet api service (build context = repo root).
 # Postgres is provisioned separately via the Railway dashboard.
 [build]
 builder = "DOCKERFILE"

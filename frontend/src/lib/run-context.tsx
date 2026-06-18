@@ -6,7 +6,7 @@ import { triggerRun as apiTriggerRun, getRun, listProfiles, apiGet } from "./api
 import { countByStatus, latestRunResults } from "./format";
 import { useAuth } from "./auth";
 
-const PROFILE_STORAGE_KEY = "aegis_active_profile";
+const PROFILE_STORAGE_KEY = "comet_active_profile";
 
 type RunCtx = {
   profiles: ProfileOut[];

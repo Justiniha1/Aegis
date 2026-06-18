@@ -1,15 +1,24 @@
 """Resolve connection profiles for the dashboard.
 
-Precedence: the per-client uploaded YAML (via `aegis push`) if present, else the
+Precedence: the per-client uploaded YAML (via `comet push`) if present, else the
 on-disk engine config (DQF_CONNECTION_YAML_PATH). Profile NAMES are safe to
 expose; full connection dicts are used only internally by the run executor.
 Secrets remain ${ENV} in the YAML and are resolved from the environment at run time.
 """
+import re
+
 import yaml as _yaml
 
 from backend.core.config_loader import _resolve_env_vars
 from dashboard_api import models
 from dashboard_api.profile_loader import _resolve_path
+
+# Secrets must be supplied as ${ENV_VAR} references so plaintext credentials are never
+# persisted server-side (H3). These drive the upload-time enforcement below.
+_ENV_REF = re.compile(r"^\$\{[A-Z0-9_]+\}$")
+_SECRET_KEYS = {"password", "secret", "token", "api_key", "access_key", "private_key", "secret_key"}
+# Password component of a connection_url netloc: scheme://user:PASSWORD@host
+_URL_PASSWORD = re.compile(r"://[^/@\s]*:([^@/\s]+)@")
 
 
 def get_yaml_text(db, client_id: int) -> str:
@@ -95,3 +104,43 @@ def is_website_schedulable(db_type: str) -> bool:
     Derived from the UNRESOLVED YAML type label — never from resolved credentials.
     """
     return db_type.lower().rstrip("/") in _WEBSITE_SCHEDULABLE_TYPES
+
+
+def find_literal_secret(yaml_text: str) -> str | None:
+    """Return an actionable message if the YAML embeds a literal secret, else None.
+
+    Enforces the ${ENV} convention at upload time (H3): a structured secret-named field
+    or a password embedded in connection_url must be an environment-variable reference,
+    not a literal value, so credentials never land in the database in plaintext.
+    Invalid YAML is left for the caller's existing handling.
+    """
+    try:
+        data = _yaml.safe_load(yaml_text) or {}
+    except _yaml.YAMLError:
+        return None
+    if not isinstance(data, dict):
+        return None
+
+    for profile_name, cfg in data.items():
+        if not isinstance(cfg, dict):
+            continue
+        for key, value in cfg.items():
+            if not isinstance(value, str) or not value.strip():
+                continue
+            lkey = key.lower()
+            if lkey in _SECRET_KEYS and not _ENV_REF.match(value.strip()):
+                return (
+                    f"Profile '{profile_name}' has a literal '{key}'. Use an environment "
+                    f"variable reference like {key}: ${{MY_{key.upper()}}} so secrets are "
+                    "never stored on the server."
+                )
+            if lkey == "connection_url":
+                m = _URL_PASSWORD.search(value)
+                if m and not _ENV_REF.match(m.group(1)):
+                    return (
+                        f"Profile '{profile_name}' embeds a literal password in "
+                        "connection_url. Use an environment variable reference like "
+                        "postgresql://user:${DB_PASSWORD}@host/db so secrets are never "
+                        "stored on the server."
+                    )
+    return None

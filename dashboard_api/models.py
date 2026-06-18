@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import relationship
 
 from dashboard_api.database import Base
@@ -14,6 +14,8 @@ class Client(Base):
     email = Column(String, unique=True, nullable=True)
     password_hash = Column(String, nullable=True)
     api_key_hash = Column(String, unique=True, nullable=False)
+    # Optional per-client webhook (Slack/generic) for scheduled-run failure alerts.
+    alert_webhook_url = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     results = relationship("TestResult", back_populates="client")
@@ -35,7 +37,20 @@ class Run(Base):
     error_reason = Column(String, nullable=True)     # D-17 specificity contract — populated on FAILED
     error_at_test = Column(Integer, nullable=True)   # 1-indexed test number that errored (D-15)
 
-    __table_args__ = (Index("ix_runs_client_started", "client_id", "started_at"),)
+    __table_args__ = (
+        Index("ix_runs_client_started", "client_id", "started_at"),
+        # At most one active (QUEUED/RUNNING) run per client — DB-level D-09 guard so a
+        # poller/manual-trigger race cannot create two concurrent runs (the check-then-insert
+        # in queries.active_run is only advisory). Applied to fresh DBs by create_all and to
+        # existing DBs by database.ensure_active_run_index().
+        Index(
+            "uq_runs_one_active_per_client",
+            "client_id",
+            unique=True,
+            sqlite_where=text("status IN ('QUEUED', 'RUNNING')"),
+            postgresql_where=text("status IN ('QUEUED', 'RUNNING')"),
+        ),
+    )
 
 
 class TestResult(Base):

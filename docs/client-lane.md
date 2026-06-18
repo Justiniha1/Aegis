@@ -1,6 +1,6 @@
 # Client-Lane Runbook
 
-The Aegis platform offers two scheduling lanes:
+The Comet platform offers two scheduling lanes:
 
 - **Website lane** — the hosted scheduler on Railway triggers runs for cloud-reachable
   database profiles (PostgreSQL, MySQL, Snowflake without an IP allowlist). You manage
@@ -34,37 +34,37 @@ difference in what you see.
 
 ## Self-run the engine against the hosted dashboard
 
-You only need two things: an `AEGIS_API_KEY` and a `database_connection.yaml`. No
-`aegis/config.yaml` is required — the CLI defaults `api_url` to the hosted dashboard
+You only need two things: an `COMET_API_KEY` and a `database_connection.yaml`. No
+`comet/config.yaml` is required — the CLI defaults `api_url` to the hosted dashboard
 automatically.
 
 ### 1. Install the engine
 
-Install the `aegis-dq` package with the extras matching your database type:
+Install the `comet-dq` package with the extras matching your database type:
 
 ```bash
 # PostgreSQL
-pip install "aegis-dq[postgres]"
+pip install "comet-dq[postgres]"
 
 # MySQL / MariaDB
-pip install "aegis-dq[mysql]"
+pip install "comet-dq[mysql]"
 
 # Snowflake
-pip install "aegis-dq[snowflake]"
+pip install "comet-dq[snowflake]"
 
 # MSSQL (requires unixodbc + Microsoft ODBC driver on the host)
-pip install "aegis-dq[mssql]"
+pip install "comet-dq[mssql]"
 
 # All supported cloud drivers
-pip install "aegis-dq[all-db]"
+pip install "comet-dq[all-db]"
 ```
 
-### 2. Set AEGIS_API_KEY
+### 2. Set COMET_API_KEY
 
 Add your API key to a `.env` file in your project directory (or export it directly):
 
 ```
-AEGIS_API_KEY=<your-api-key>
+COMET_API_KEY=<your-api-key>
 ```
 
 Your API key is displayed once when you create your account via `POST /api/v1/clients`.
@@ -73,7 +73,7 @@ you have not saved it.
 
 ### 3. Provide your database_connection.yaml
 
-Create `aegis/database_connection.yaml` with your connection profile. Secrets are
+Create `comet/database_connection.yaml` with your connection profile. Secrets are
 referenced as `${ENV_VAR}` — never hardcoded:
 
 ```yaml
@@ -105,41 +105,41 @@ DB_USER=readonly_user
 DB_PASSWORD=yourpassword
 ```
 
-No `aegis/config.yaml` is needed. The CLI always talks to the hosted dashboard at
-`https://api.aegis-dq.com` — the API URL is fixed and not a client-facing setting.
+No `comet/config.yaml` is needed. The CLI always talks to the hosted dashboard at
+`https://api.comet-dq.com` — the API URL is fixed and not a client-facing setting.
 
 ### 4. Push your profile and run
 
 ```bash
 # Upload your connection profile to the dashboard
-aegis push
+comet push
 
 # Trigger a run (pass --profile; defaults to "dev" if omitted)
-aegis run --profile my_warehouse
+comet run --profile my_warehouse
 ```
 
 Results appear on the dashboard immediately.
 
 ---
 
-## Schedule from your own environment via AegisDQOperator
+## Schedule from your own environment via CometDQOperator
 
-For recurring runs, use the `AegisDQOperator` in an Airflow DAG. The operator calls the
-Aegis API to trigger a run and polls for completion.
+For recurring runs, use the `CometDQOperator` in an Airflow DAG. The operator calls the
+Comet API to trigger a run and polls for completion.
 
 ### Prerequisites
 
 Install the Airflow extra:
 
 ```bash
-pip install "aegis-dq[airflow]"
+pip install "comet-dq[airflow]"
 ```
 
 Set this variable in your Airflow environment (or `.env`) — the hosted API URL is baked
 into the SDK, so the key is the only thing you configure:
 
 ```
-AEGIS_API_KEY=<your-api-key>
+COMET_API_KEY=<your-api-key>
 ```
 
 ### Example DAG
@@ -147,21 +147,21 @@ AEGIS_API_KEY=<your-api-key>
 ```python
 from datetime import datetime
 from airflow import DAG
-from aegis_dq.operators.airflow_operator import AegisDQOperator
+from comet_dq.operators.airflow_operator import CometDQOperator
 
 with DAG(
-    dag_id="aegis_daily_checks",
+    dag_id="comet_daily_checks",
     start_date=datetime(2026, 1, 1),
     schedule_interval="0 6 * * *",  # daily at 06:00 UTC
     catchup=False,
 ) as dag:
-    run_checks = AegisDQOperator(
-        task_id="run_aegis_checks",
+    run_checks = CometDQOperator(
+        task_id="run_comet_checks",
         profile="my_warehouse",
     )
 ```
 
-The operator reads `AEGIS_API_KEY` from the environment (the API URL is fixed to the hosted
+The operator reads `COMET_API_KEY` from the environment (the API URL is fixed to the hosted
 endpoint). No DAG code change is needed if you rotate the API key — update the Airflow
 variable or secret.
 
@@ -179,8 +179,8 @@ with platform updates and cannot be added to a Snowflake network policy in a sta
 Options:
 
 1. **Use the client lane** (this runbook). Your Airflow workers or local machines
-   already have allowlisted IPs; schedule from there using `AegisDQOperator`.
-2. **Remove the IP restriction for the Aegis service account.** If the account is
+   already have allowlisted IPs; schedule from there using `CometDQOperator`.
+2. **Remove the IP restriction for the Comet service account.** If the account is
    read-only and scoped to only the data quality role, this reduces the risk surface.
    Consult your Snowflake administrator.
 
@@ -195,5 +195,5 @@ history if the Snowflake instance is unreachable. No silent failures.
 |------|-------|
 | Full deploy guide | [DEPLOY.md](../DEPLOY.md) |
 | Hosted scheduler caveats | [DEPLOY.md — Hosted scheduler](../DEPLOY.md#hosted-scheduler) |
-| Connection profile format | `aegis/database_connection.yaml` (scaffolded by `aegis init`) |
+| Connection profile format | `comet/database_connection.yaml` (scaffolded by `comet init`) |
 | API key management | `POST /api/v1/clients` response; stored in Railway Variables |

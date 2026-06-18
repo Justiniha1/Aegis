@@ -1,5 +1,5 @@
 -- deploy/demo/db/seed_demo.sql
--- Idempotent demo dataset for the Aegis Airflow demo.
+-- Idempotent demo dataset for the Comet Airflow demo.
 -- Re-run this to reset the demo to a known-good, all-checks-pass state.
 
 DROP TABLE IF EXISTS orders;

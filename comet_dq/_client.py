@@ -1,4 +1,4 @@
-"""Internal HTTP client for aegis_dq public API.
+"""Internal HTTP client for comet_dq public API.
 
 Never import this from user code. Use run_checks() instead.
 """
@@ -8,13 +8,13 @@ import os
 import time
 import requests
 
-# The hosted Aegis API URL is fixed and baked in — every client talks to the same endpoint,
+# The hosted Comet API URL is fixed and baked in — every client talks to the same endpoint,
 # so it is never a client-facing setting and is NOT configurable via any environment variable.
 # The `api_url=` constructor argument exists only as an internal/testing override.
 DEFAULT_API_URL = "https://aegis-production-fa56.up.railway.app"
 
 
-class AegisAPIClient:
+class CometAPIClient:
     """Thin HTTP wrapper that reads credentials from environment variables.
 
     Constructor params override env vars when provided (useful for testing).
@@ -29,10 +29,10 @@ class AegisAPIClient:
         api_key: str | None = None,
     ) -> None:
         self._base = (api_url or DEFAULT_API_URL).rstrip("/")
-        self._key = api_key or os.getenv("AEGIS_API_KEY", "")
+        self._key = api_key or os.getenv("COMET_API_KEY", "")
         if not self._key:
             raise ValueError(
-                "AEGIS_API_KEY is required. Set the environment variable or pass api_key=."
+                "COMET_API_KEY is required. Set the environment variable or pass api_key=."
             )
         self._headers = {"X-Api-Key": self._key}
 

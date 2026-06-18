@@ -1,7 +1,7 @@
-# Deploying Aegis to Railway
+# Deploying Comet to Railway
 
 This is an **owner-operated, single-instance** deploy guide. There is no public
-"Deploy on Railway" one-click button (D-07) — you deploy Aegis once for your own
+"Deploy on Railway" one-click button (D-07) — you deploy Comet once for your own
 hosted instance and occasionally re-deploy. The goal: stand the stack up from
 scratch in **under 15 minutes** by following this runbook.
 
@@ -54,7 +54,7 @@ that folder's `railway.toml` and the **Build → Builder** will switch to
 Config-as-code → Add File Path = `railway.toml`** to force it.)
 
 > **Name the `api` service exactly `api`.** Railway auto-creates the first service
-> from your repo name (e.g. `aegis`). Either rename it to `api` here, or be ready to
+> from your repo name (e.g. `comet`). Either rename it to `api` here, or be ready to
 > use the **literal** API domain in step 4 — the cross-service reference variable
 > `${{api.RAILWAY_PUBLIC_DOMAIN}}` only resolves if a service is literally named `api`.
 
@@ -166,29 +166,29 @@ Run these against the live instance:
    $resp | ConvertTo-Json
    ```
    **Save the `api_key`** from the `201` response — it is **shown once only** and is
-   the `AEGIS_API_KEY` your Airflow worker will need.
+   the `COMET_API_KEY` your Airflow worker will need.
 
 3. **Confirm login:** open `https://<frontend>.railway.app`, log in with that
    email/password. The dashboard should load with **no console CORS errors**.
 
 4. **Seed test definitions and connection profiles.** In your local project directory
-   (where `aegis/` lives), run:
+   (where `comet/` lives), run:
    ```bash
-   aegis init   # if you haven't already scaffolded the project
-   aegis push   # uploads aegis/test_definitions.yaml and aegis/database_connection.yaml
+   comet init   # if you haven't already scaffolded the project
+   comet push   # uploads comet/test_definitions.yaml and comet/database_connection.yaml
    ```
    This populates the dashboard's **Active Environment** selector with your connection
    profile names and makes test definitions available for runs. Without this step the
    profile dropdown will be empty.
 
 5. **Point an Airflow worker at the live API.** The engine runs on the client's own
-   infra (D-04). In the Airflow environment / `.env` used by the `aegis-dq` SDK, set only:
+   infra (D-04). In the Airflow environment / `.env` used by the `comet-dq` SDK, set only:
    ```
-   AEGIS_API_KEY=<api_key saved in step 2>
+   COMET_API_KEY=<api_key saved in step 2>
    ```
-   The hosted API URL is baked into the SDK (`aegis_dq/_client.py`) and is not configurable —
+   The hosted API URL is baked into the SDK (`comet_dq/_client.py`) and is not configurable —
    the client only ever sets the key. No DAG code change is needed.
-   (Note: `AEGIS_API_KEY` is the **SDK** variable — not the backend engine's `DQF_API_KEY`,
+   (Note: `COMET_API_KEY` is the **SDK** variable — not the backend engine's `DQF_API_KEY`,
    which is a different integration.)
 
 ---
@@ -222,7 +222,7 @@ resulting in duplicate runs.
 The current `dashboard_api/Dockerfile` `CMD` starts a single uvicorn worker (no
 `--workers` flag). Do not change this while the in-process scheduler is in use.
 
-The scheduler is gated by the `AEGIS_SCHEDULER_ENABLED` environment variable:
+The scheduler is gated by the `COMET_SCHEDULER_ENABLED` environment variable:
 
 | Value | Behavior |
 |-------|----------|
@@ -230,7 +230,7 @@ The scheduler is gated by the `AEGIS_SCHEDULER_ENABLED` environment variable:
 | `0` | Scheduler does not start (useful for staging or read-only replicas) |
 
 If you scale the `api` service to more than one Railway replica, set
-`AEGIS_SCHEDULER_ENABLED=0` on all but one replica to prevent double-firing.
+`COMET_SCHEDULER_ENABLED=0` on all but one replica to prevent double-firing.
 
 ### New schedules table — no Alembic migration needed
 

@@ -12,22 +12,37 @@ from dashboard_api.limiter import limiter
 from dashboard_api import models
 from dashboard_api.database import engine
 from dashboard_api.routers import auth_routes, clients, profiles, results, runs, schedules, tests
+from dashboard_api.runtime_checks import check_production_config
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """FastAPI lifespan: create tables then optionally start the scheduler.
+    """FastAPI lifespan: validate prod config, create tables, optionally start the scheduler.
 
     Single-process requirement: the Dockerfile CMD is already single-process/single-replica.
-    AEGIS_SCHEDULER_ENABLED=1 (the default) starts the in-process poller here.
-    Set AEGIS_SCHEDULER_ENABLED=0 (or any value other than "1") to disable — this is the
+    COMET_SCHEDULER_ENABLED=1 (the default) starts the in-process poller here.
+    Set COMET_SCHEDULER_ENABLED=0 (or any value other than "1") to disable — this is the
     seam for future graduation to a dedicated worker process or to disable polling in test
     environments that do not want a background thread.
     """
+    # Refuse to start a production deployment with data-losing/insecure config (no-op in dev).
+    problems = check_production_config()
+    if problems:
+        raise RuntimeError(
+            "Refusing to start: insecure production configuration:\n  - "
+            + "\n  - ".join(problems)
+        )
+
     # Create all tables on startup (no-op if they already exist).
     models.Base.metadata.create_all(bind=engine)
 
-    if os.getenv("AEGIS_SCHEDULER_ENABLED", "1") == "1":
+    # Apply lightweight schema upgrades to already-provisioned databases
+    # (create_all does not alter existing tables).
+    from dashboard_api.database import ensure_active_run_index, ensure_client_alert_column
+    ensure_active_run_index()
+    ensure_client_alert_column()
+
+    if os.getenv("COMET_SCHEDULER_ENABLED", "1") == "1":
         from dashboard_api.scheduler import start_scheduler
         from dashboard_api.database import SessionLocal
         start_scheduler()
@@ -42,7 +57,7 @@ async def lifespan(app: FastAPI):
             f"rehydrated {n} enabled schedule(s)"
         )
     else:
-        print("[scheduler] disabled (AEGIS_SCHEDULER_ENABLED != 1)")
+        print("[scheduler] disabled (COMET_SCHEDULER_ENABLED != 1)")
 
     yield
 

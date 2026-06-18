@@ -98,13 +98,17 @@ def get_client_any_auth(
 
     if authorization and authorization.lower().startswith("bearer "):
         token = authorization.split(" ", 1)[1]
+        # A bearer token was supplied: a decode failure is an invalid credential, not a
+        # missing one. Report it distinctly instead of silently falling through to the
+        # generic "authentication required" (matches get_current_client_jwt).
         try:
             payload = jwt.decode(token, _SECRET, algorithms=[_ALGORITHM])
             client_id = int(payload["sub"])
-            client = db.query(models.Client).filter(models.Client.id == client_id).first()
-            if client:
-                return client
         except jwt.PyJWTError:
-            pass
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        client = db.query(models.Client).filter(models.Client.id == client_id).first()
+        if client:
+            return client
+        raise HTTPException(status_code=401, detail="Client not found")
 
     raise HTTPException(status_code=401, detail="Authentication required")
