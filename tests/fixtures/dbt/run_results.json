@@ -1,0 +1,13 @@
+{
+  "metadata": { "dbt_schema_version": "https://schemas.getdbt.com/dbt/run-results/v6.json" },
+  "results": [
+    { "unique_id": "test.demo.not_null_orders_id.aaa111", "status": "pass", "failures": 0, "execution_time": 0.05, "message": null },
+    { "unique_id": "test.demo.unique_orders_id.bbb222", "status": "fail", "failures": 3, "execution_time": 0.08, "message": "Got 3 results, configured to fail if != 0" },
+    { "unique_id": "test.demo.relationships_orders_customer_id.ccc333", "status": "error", "failures": null, "execution_time": 0.01, "message": "Database Error: relation does not exist" },
+    { "unique_id": "test.demo.accepted_values_orders_status.ddd444", "status": "warn", "failures": 2, "execution_time": 0.03, "message": "Got 2 results, configured to warn if != 0" },
+    { "unique_id": "test.demo.not_null_orders_total.eee555", "status": "skipped", "failures": null, "execution_time": 0.0, "message": null },
+    { "unique_id": "test.demo.assert_positive_amount.fff666", "status": "pass", "failures": 0, "execution_time": 0.02, "message": null },
+    { "unique_id": "model.demo.orders", "status": "success", "failures": null, "execution_time": 0.5, "message": "OK" },
+    { "unique_id": "test.demo.orphan_no_manifest_node.ggg777", "status": "pass", "failures": 0, "execution_time": 0.01, "message": null }
+  ]
+}

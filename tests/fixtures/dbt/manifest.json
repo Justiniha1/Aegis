@@ -1,0 +1,50 @@
+{
+  "metadata": { "dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v12.json" },
+  "nodes": {
+    "test.demo.not_null_orders_id.aaa111": {
+      "resource_type": "test",
+      "name": "not_null_orders_id",
+      "column_name": "id",
+      "config": { "severity": "ERROR" },
+      "test_metadata": { "name": "not_null", "kwargs": { "column_name": "id" } }
+    },
+    "test.demo.unique_orders_id.bbb222": {
+      "resource_type": "test",
+      "name": "unique_orders_id",
+      "column_name": "id",
+      "config": { "severity": "ERROR" },
+      "test_metadata": { "name": "unique", "kwargs": { "column_name": "id" } }
+    },
+    "test.demo.relationships_orders_customer_id.ccc333": {
+      "resource_type": "test",
+      "name": "relationships_orders_customer_id",
+      "column_name": "customer_id",
+      "config": { "severity": "ERROR" },
+      "test_metadata": { "name": "relationships", "kwargs": { "field": "id", "to": "ref('customers')" } }
+    },
+    "test.demo.accepted_values_orders_status.ddd444": {
+      "resource_type": "test",
+      "name": "accepted_values_orders_status",
+      "column_name": "status",
+      "config": { "severity": "WARN" },
+      "test_metadata": { "name": "accepted_values", "kwargs": { "values": ["placed", "shipped"] } }
+    },
+    "test.demo.not_null_orders_total.eee555": {
+      "resource_type": "test",
+      "name": "not_null_orders_total",
+      "column_name": "total",
+      "config": { "severity": "ERROR" },
+      "test_metadata": { "name": "not_null", "kwargs": { "column_name": "total" } }
+    },
+    "test.demo.assert_positive_amount.fff666": {
+      "resource_type": "test",
+      "name": "assert_positive_amount",
+      "config": { "severity": "ERROR" }
+    },
+    "model.demo.orders": {
+      "resource_type": "model",
+      "name": "orders",
+      "config": { "severity": "ERROR" }
+    }
+  }
+}
