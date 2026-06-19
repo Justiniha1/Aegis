@@ -14,6 +14,11 @@ export const TYPE_LABELS: Record<string, string> = {
   range_check: "Range Check",
   relationship_check: "Relationship Check",
   custom_sql: "Custom SQL",
+  dbt_not_null: "dbt: Not Null",
+  dbt_unique: "dbt: Unique",
+  dbt_relationships: "dbt: Relationships",
+  dbt_accepted_values: "dbt: Accepted Values",
+  dbt_test: "dbt: Test",
 };
 
 export const SEVERITY_LABELS: Record<string, string> = {
@@ -85,6 +90,11 @@ export const TYPE_PILL_COLORS: Record<string, string> = {
   unique_check: "#7C3AED",
   relationship_check: "#06B6D4",
   custom_sql: "#475569",
+  dbt_not_null: "#FF694B",
+  dbt_unique: "#FF694B",
+  dbt_relationships: "#FF694B",
+  dbt_accepted_values: "#FF694B",
+  dbt_test: "#FF694B",
 };
 
 export const SIDEBAR_ACTIVE_BG = "#0B3A66";
