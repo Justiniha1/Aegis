@@ -7,12 +7,12 @@ from sqlalchemy.orm import Session
 from dashboard_api import models, schemas
 from dashboard_api.auth import get_client_any_auth, get_current_client
 from dashboard_api.database import get_db
-from dashboard_api.constants import TEST_TYPES
+from dashboard_api.constants import TEST_TYPES, DBT_TEST_TYPES
 
 router = APIRouter(prefix="/api/v1/results", tags=["results"])
 
 _ALLOWED_STATUSES = frozenset({"PASSED", "FAILED", "ERROR", "SKIPPED"})
-_ALLOWED_TYPES = TEST_TYPES
+_ALLOWED_TYPES = TEST_TYPES | DBT_TEST_TYPES
 
 
 @router.post("", status_code=201)

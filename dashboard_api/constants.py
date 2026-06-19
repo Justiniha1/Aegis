@@ -16,3 +16,14 @@ TEST_TYPES = frozenset({
     "relationship_check",
     "custom_sql",
 })
+
+# dbt-sourced result types produced by `comet dbt publish`. These are ingest-only
+# labels (not executable check types), but the results GET filter must accept them
+# so the dashboard can filter dbt results by kind.
+DBT_TEST_TYPES = frozenset({
+    "dbt_not_null",
+    "dbt_unique",
+    "dbt_relationships",
+    "dbt_accepted_values",
+    "dbt_test",
+})
